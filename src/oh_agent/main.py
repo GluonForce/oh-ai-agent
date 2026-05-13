@@ -157,7 +157,15 @@ async def generate_workflow(request: WorkflowRequest) -> WorkflowResponse:
     audit_svc = _get_audit()
 
     agent = WorkflowAgent(settings=settings, retriever=retriever)
-    response, audit_entries = agent.generate(request)
+    try:
+        response, audit_entries = agent.generate(request)
+    except Exception as exc:
+        msg = str(exc)
+        if "insufficient_quota" in msg or "exceeded" in msg.lower():
+            raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc
+        if "api key" in msg.lower() or "auth" in msg.lower():
+            raise HTTPException(401, f"LLM authentication failed: {msg}") from exc
+        raise HTTPException(502, f"LLM request failed: {msg}") from exc
     audit_svc.log_many(audit_entries)
     return response
 
@@ -180,7 +188,13 @@ async def benchmark(request: BenchmarkRequest) -> BenchmarkResult:
     audit_svc = _get_audit()
 
     agent = BenchmarkAgent(settings=settings, retriever=retriever)
-    result, audit_entries = agent.benchmark(request.organisation, request.hazards)
+    try:
+        result, audit_entries = agent.benchmark(request.organisation, request.hazards)
+    except Exception as exc:
+        msg = str(exc)
+        if "insufficient_quota" in msg or "exceeded" in msg.lower():
+            raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc
+        raise HTTPException(502, f"LLM request failed: {msg}") from exc
     audit_svc.log_many(audit_entries)
     return result
 
@@ -193,7 +207,13 @@ async def gap_analysis(request: BenchmarkRequest) -> GapAnalysis:
     audit_svc = _get_audit()
 
     agent = BenchmarkAgent(settings=settings, retriever=retriever)
-    result, audit_entries = agent.gap_analysis(request.organisation, request.hazards)
+    try:
+        result, audit_entries = agent.gap_analysis(request.organisation, request.hazards)
+    except Exception as exc:
+        msg = str(exc)
+        if "insufficient_quota" in msg or "exceeded" in msg.lower():
+            raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc
+        raise HTTPException(502, f"LLM request failed: {msg}") from exc
     audit_svc.log_many(audit_entries)
     return result
 

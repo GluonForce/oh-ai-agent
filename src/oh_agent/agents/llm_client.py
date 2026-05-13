@@ -21,6 +21,20 @@ from oh_agent.config import Settings
 logger = logging.getLogger(__name__)
 
 
+def _normalise_base_url(url: str) -> str:
+    """Normalise a user-supplied base URL for the OpenAI SDK.
+
+    The SDK expects a base like ``https://host/v1`` and appends
+    ``/chat/completions`` itself.  Users sometimes paste the full
+    endpoint URL, so strip trailing path segments if present.
+    """
+    url = url.rstrip("/")
+    for suffix in ["/chat/completions", "/completions", "/embeddings"]:
+        if url.endswith(suffix):
+            url = url[: -len(suffix)].rstrip("/")
+    return url
+
+
 def create_llm_client(settings: Settings) -> OpenAI:
     """Build an OpenAI client configured from application settings.
 
@@ -31,10 +45,11 @@ def create_llm_client(settings: Settings) -> OpenAI:
     kwargs: dict[str, str] = {"api_key": api_key}
 
     if settings.llm_base_url:
-        kwargs["base_url"] = settings.llm_base_url
+        base = _normalise_base_url(settings.llm_base_url)
+        kwargs["base_url"] = base
         logger.info(
             "Using custom LLM endpoint: %s (model=%s)",
-            settings.llm_base_url,
+            base,
             settings.llm_model,
         )
     else:
