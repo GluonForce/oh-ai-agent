@@ -1,0 +1,43 @@
+"""Audit trail models for regulatory compliance.
+
+Every agent action is recorded with full provenance so that
+outputs are traceable and defensible in a regulated environment.
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
+from pydantic import BaseModel, Field
+from uuid_extensions import uuid7
+
+
+class AuditEventType(StrEnum):
+    """Categories of auditable events."""
+
+    WORKFLOW_REQUESTED = "workflow_requested"
+    WORKFLOW_GENERATED = "workflow_generated"
+    BENCHMARK_REQUESTED = "benchmark_requested"
+    BENCHMARK_GENERATED = "benchmark_generated"
+    GAP_ANALYSIS_REQUESTED = "gap_analysis_requested"
+    GAP_ANALYSIS_GENERATED = "gap_analysis_generated"
+    KNOWLEDGE_RETRIEVED = "knowledge_retrieved"
+    DOCUMENT_INGESTED = "document_ingested"
+    GUARDRAIL_TRIGGERED = "guardrail_triggered"
+    ERROR = "error"
+
+
+class AuditEntry(BaseModel):
+    """Immutable audit log entry."""
+
+    id: str = Field(default_factory=lambda: str(uuid7()))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    event_type: AuditEventType
+    request_id: str | None = None
+    actor: str = "system"
+    detail: dict[str, Any] = Field(default_factory=dict)
+    sources_used: list[str] = Field(default_factory=list)
+    model_used: str | None = None
+    guardrails_applied: list[str] = Field(default_factory=list)
