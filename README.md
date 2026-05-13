@@ -27,31 +27,66 @@ An open-access AI Agent that supports occupational health (OH) practitioners in 
 
 ---
 
-## Quick Start
+## Quick Start (Local Setup)
 
 ### Prerequisites
 
 - Python 3.11+
+- Node.js 18+ and npm
 - An API key for any OpenAI-compatible LLM provider
 
-### Installation
+### 1. Clone the Repository
 
 ```bash
-# Clone and install (development mode)
+git clone https://github.com/GluonForce/oh-ai-agent.git
+cd oh-ai-agent
+```
+
+### 2. Backend Setup
+
+```bash
+# Install Python dependencies (development mode)
 pip install -e ".[dev]"
 
 # Copy environment config
 cp .env.example .env
-# Edit .env — see "LLM Provider Configuration" below
+# Edit .env and set your LLM API key — see "LLM Provider Configuration" below
 ```
 
-### Run the Development Server
+### 3. Frontend Setup
+
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+### 4. Start the Backend
 
 ```bash
 uvicorn oh_agent.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+The API will be available at `http://localhost:8000`. Interactive API docs (Swagger UI) at `http://localhost:8000/docs`.
+
+### 5. Start the Frontend (in a separate terminal)
+
+```bash
+cd frontend
+npm run dev
+```
+
+The UI will be available at `http://localhost:3000`.
+
+### All-in-One (both services)
+
+```bash
+# Terminal 1 — Backend
+uvicorn oh_agent.main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 — Frontend
+cd frontend && npm run dev
+```
 
 ### LLM Provider Configuration
 
@@ -94,15 +129,23 @@ OH_LLM_API_KEY=ollama
 ### Run Tests
 
 ```bash
+# Backend tests
 pytest
+
+# Frontend lint
+cd frontend && npm run lint
 ```
 
 ### Lint & Type Check
 
 ```bash
+# Backend
 ruff check src/ tests/
 ruff format --check src/ tests/
 mypy src/
+
+# Frontend
+cd frontend && npm run lint && npm run build
 ```
 
 ---
@@ -128,27 +171,56 @@ mypy src/
 ## Project Structure
 
 ```
-src/oh_agent/
-├── main.py                 # FastAPI application
-├── config.py               # Configuration (env-var driven)
-├── models/                 # Pydantic domain models
-│   ├── hazard.py           # Hazard & exposure models
-│   ├── organisation.py     # Organisation profile
-│   ├── workflow.py         # Workflow, benchmark, gap analysis
-│   └── audit.py            # Audit trail
-├── agents/                 # Agent logic
-│   ├── workflow_agent.py   # Workflow generation (LLM + RAG)
-│   ├── benchmark_agent.py  # Benchmarking & gap analysis
-│   └── guardrails.py       # Compliance guardrails
-├── knowledge/              # Knowledge/RAG layer
-│   ├── retriever.py        # ChromaDB vector retrieval
-│   ├── ingestion.py        # Document ingestion pipeline
-│   └── sources.py          # Authoritative source registry
-├── services/
-│   └── audit_service.py    # Audit logging service
-└── middleware/
-    └── logging.py          # HTTP request logging
+oh-ai-agent/
+├── src/oh_agent/               # Backend (Python/FastAPI)
+│   ├── main.py                 # FastAPI application & endpoints
+│   ├── config.py               # Configuration (env-var driven)
+│   ├── models/                 # Pydantic domain models
+│   │   ├── hazard.py           # Hazard & exposure models
+│   │   ├── organisation.py     # Organisation profile
+│   │   ├── workflow.py         # Workflow, benchmark, gap analysis
+│   │   └── audit.py            # Audit trail
+│   ├── agents/                 # Agent logic
+│   │   ├── workflow_agent.py   # Workflow generation (LLM + RAG)
+│   │   ├── benchmark_agent.py  # Benchmarking & gap analysis
+│   │   ├── llm_client.py       # Multi-provider LLM client factory
+│   │   └── guardrails.py       # Compliance guardrails
+│   ├── knowledge/              # Knowledge/RAG layer
+│   │   ├── retriever.py        # ChromaDB vector retrieval
+│   │   ├── ingestion.py        # Document ingestion pipeline
+│   │   └── sources.py          # Authoritative source registry
+│   ├── services/
+│   │   └── audit_service.py    # Audit logging service
+│   └── middleware/
+│       └── logging.py          # HTTP request logging
+├── frontend/                   # Frontend (Next.js + shadcn/ui)
+│   └── src/
+│       ├── app/                # Pages (dashboard, workflows, benchmark, etc.)
+│       ├── components/         # Shared UI components & shadcn/ui
+│       └── lib/                # API client, types, utilities
+├── tests/                      # Backend test suite (pytest)
+├── knowledge_base/             # Drop authoritative documents here
+├── pyproject.toml              # Python project config & dependencies
+├── Dockerfile                  # Production container
+└── .env.example                # Environment variable template
 ```
+
+---
+
+## Frontend
+
+The frontend is a Next.js application using [shadcn/ui](https://ui.shadcn.com/) components, providing a professional healthcare-appropriate interface.
+
+| Page | Description |
+|---|---|
+| **Dashboard** | System health, knowledge stats, audit count, mandatory disclaimers |
+| **Workflow Generator** | Organisation + hazard input form → generated workflow steps table |
+| **Benchmarking** | Compliance/non-compliance breakdown with recommendations |
+| **Gap Analysis** | Structured gap table with ratings and regulatory references |
+| **Knowledge Base** | Browse sources, view stats, upload documents, re-ingest |
+| **Audit Trail** | Color-coded event log with timestamps for regulatory traceability |
+
+The frontend connects to the backend at `http://localhost:8000` by default. To change this, set the `NEXT_PUBLIC_API_URL` environment variable before starting the frontend.
 
 ---
 
