@@ -28,6 +28,8 @@ See `README.md` and `pyproject.toml` for full details. Quick reference:
 
 - The `uuid7` PyPI package installs its module as `uuid_extensions`, not `uuid7`. Imports should use `from uuid_extensions import uuid7`.
 - The dev server auto-ingests documents from `knowledge_base/` on startup. Place `.txt`, `.md`, or `.docx` files there.
-- Workflow/benchmark/gap-analysis endpoints require a valid `OH_OPENAI_API_KEY` env var to call the LLM. Without it, those endpoints will fail. All other endpoints (health, info, knowledge, audit) work without an API key.
+- Workflow/benchmark/gap-analysis endpoints require an LLM API key (`OH_LLM_API_KEY` or `OH_OPENAI_API_KEY`). Without it, those endpoints will fail. All other endpoints (health, info, knowledge, audit) work without an API key.
+- The LLM backend is configurable via `OH_LLM_BASE_URL` — any OpenAI-compatible endpoint works (OpenRouter, Anthropic, Groq, Together, local Ollama, etc.). See `.env.example` for provider examples.
+- `OH_LLM_API_KEY` takes precedence over `OH_OPENAI_API_KEY` when both are set.
 - The API docs (Swagger UI) are at `/docs` when the server is running.
 - Python 3.11+ is required. The environment uses Python 3.12.

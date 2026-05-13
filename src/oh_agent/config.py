@@ -35,9 +35,26 @@ class Settings(BaseSettings):
 
     # --- LLM ---
     openai_api_key: str = ""
+    llm_api_key: str = Field(
+        default="",
+        description="Generic LLM API key (takes precedence over openai_api_key).",
+    )
+    llm_base_url: str = Field(
+        default="",
+        description=(
+            "Custom base URL for OpenAI-compatible API. "
+            "Leave empty for default OpenAI. "
+            "Examples: https://api.anthropic.com/v1, https://openrouter.ai/api/v1"
+        ),
+    )
     llm_model: str = "gpt-4o"
     llm_temperature: float = 0.1
     llm_max_tokens: int = 4096
+
+    @property
+    def effective_api_key(self) -> str:
+        """Return the active API key (llm_api_key takes precedence)."""
+        return self.llm_api_key or self.openai_api_key or ""
 
     # --- Knowledge / RAG ---
     knowledge_dir: Path = Path("knowledge_base")

@@ -32,7 +32,7 @@ An open-access AI Agent that supports occupational health (OH) practitioners in 
 ### Prerequisites
 
 - Python 3.11+
-- An OpenAI API key (or compatible LLM provider)
+- An API key for any OpenAI-compatible LLM provider
 
 ### Installation
 
@@ -42,7 +42,7 @@ pip install -e ".[dev]"
 
 # Copy environment config
 cp .env.example .env
-# Edit .env and set OH_OPENAI_API_KEY
+# Edit .env — see "LLM Provider Configuration" below
 ```
 
 ### Run the Development Server
@@ -52,6 +52,44 @@ uvicorn oh_agent.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+
+### LLM Provider Configuration
+
+The agent works with **any OpenAI-compatible API**. Set these environment variables in `.env`:
+
+| Variable | Description |
+|---|---|
+| `OH_LLM_API_KEY` | Your API key (takes precedence over `OH_OPENAI_API_KEY`) |
+| `OH_LLM_BASE_URL` | Custom endpoint URL (leave empty for OpenAI) |
+| `OH_LLM_MODEL` | Model identifier matching your provider |
+
+**Provider examples:**
+
+```bash
+# OpenAI (default)
+OH_LLM_API_KEY=sk-...
+OH_LLM_MODEL=gpt-4o
+
+# OpenRouter (access to many models)
+OH_LLM_API_KEY=sk-or-...
+OH_LLM_BASE_URL=https://openrouter.ai/api/v1
+OH_LLM_MODEL=anthropic/claude-sonnet-4
+
+# Anthropic direct
+OH_LLM_API_KEY=sk-ant-...
+OH_LLM_BASE_URL=https://api.anthropic.com/v1
+OH_LLM_MODEL=claude-sonnet-4-20250514
+
+# Groq (fast inference)
+OH_LLM_API_KEY=gsk_...
+OH_LLM_BASE_URL=https://api.groq.com/openai/v1
+OH_LLM_MODEL=llama-3.3-70b-versatile
+
+# Local Ollama
+OH_LLM_BASE_URL=http://localhost:11434/v1
+OH_LLM_MODEL=llama3
+OH_LLM_API_KEY=ollama
+```
 
 ### Run Tests
 

@@ -1,0 +1,27 @@
+Health Surveillance at Work — Key Requirements (Summary based on HSG61)
+
+Health surveillance is required under COSHH Regulation 11 where workers are exposed
+to substances hazardous to health and there is a reasonable likelihood that an
+identifiable disease or adverse health effect may occur.
+
+The purpose of health surveillance is to:
+1. Detect adverse health effects at an early stage
+2. Provide data to help evaluate health risks
+3. Enable action to be taken to prevent further harm
+
+For wet work exposure (prolonged hand immersion, frequent hand washing):
+- Baseline skin assessment before exposure begins
+- Regular skin checks at intervals of no more than 12 months
+- Self-reporting mechanisms for skin symptoms
+- Referral to OH specialist if dermatitis or skin changes detected
+- Record keeping in accordance with COSHH Regulation 11(4)
+
+Delegation: Skin assessments may be performed by trained OH technicians under
+supervision of a qualified OH nurse or physician. The supervising clinician remains
+responsible for the quality of the assessment.
+
+Minimum regulatory compliance requires:
+- Written policy for health surveillance
+- Competent person to carry out surveillance
+- Individual health records maintained for 40 years
+- Outcomes fed back to the risk assessment process

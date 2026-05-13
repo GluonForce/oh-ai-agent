@@ -120,7 +120,12 @@ class WorkflowAgent:
     ) -> None:
         self._settings = settings
         self._retriever = retriever
-        self._client = client or OpenAI(api_key=settings.openai_api_key or "not-set")
+        if client is not None:
+            self._client = client
+        else:
+            from oh_agent.agents.llm_client import create_llm_client
+
+            self._client = create_llm_client(settings)
 
     def generate(self, request: WorkflowRequest) -> tuple[WorkflowResponse, list[AuditEntry]]:
         """Generate a workflow and return it with its audit trail."""
