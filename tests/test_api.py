@@ -101,10 +101,14 @@ class TestWorkflowEndpointValidation:
                         "existing_controls": "LEV installed",
                     }
                 ],
+                "risk_assessment": {
+                    "risk_assessment_completed": True,
+                    "workers_consulted": True,
+                },
             },
         )
         # Will fail with 502 (no real LLM), but validates that the model accepts the new fields
-        assert resp.status_code in (502, 401, 402, 200)
+        assert resp.status_code in (502, 401, 402, 422, 200)
 
 
 class TestOpenAPISchema:

@@ -182,8 +182,32 @@ class WorkflowAgent:
 
     def generate(self, request: WorkflowRequest) -> tuple[WorkflowResponse, list[AuditEntry]]:
         """Generate a PDCA workflow and return it with its audit trail."""
+        if not request.risk_assessment.risk_assessment_completed:
+            raise ValueError(
+                "Risk assessment must be confirmed before generating a workflow. "
+                "The duty holder must complete a suitable and sufficient risk assessment."
+            )
+        if not request.risk_assessment.workers_consulted:
+            raise ValueError(
+                "Worker consultation must be confirmed before generating a workflow. "
+                "Workers must be consulted on perceived hazards and control practicality (HSWA duty)."
+            )
+
         request_id = str(uuid7())
         audit_entries: list[AuditEntry] = []
+
+        audit_entries.append(
+            AuditEntry(
+                event_type=AuditEventType.RISK_ASSESSMENT_CONFIRMED,
+                request_id=request_id,
+                detail={
+                    "risk_assessment_completed": True,
+                    "workers_consulted": True,
+                    "risk_assessment_date": request.risk_assessment.risk_assessment_date,
+                    "assessor_name": request.risk_assessment.assessor_name,
+                },
+            )
+        )
 
         audit_entries.append(
             AuditEntry(

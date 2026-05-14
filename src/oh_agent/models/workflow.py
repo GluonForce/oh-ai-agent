@@ -11,8 +11,16 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from oh_agent.models.hazard import HazardProfile
+from oh_agent.models.hazard import HazardProfile, RiskAssessmentConfirmation
 from oh_agent.models.organisation import OrganisationProfile
+
+
+class PDCAPhase(StrEnum):
+    PLAN = "plan"
+    DO = "do"
+    CHECK = "check"
+    ACT = "act"
+
 
 # ---------------------------------------------------------------------------
 # Shared enumerations
@@ -85,9 +93,7 @@ class SurveillanceProvision(BaseModel):
 
     surveillance_type: SurveillanceType
     description: str
-    frequency: str = Field(
-        ..., description="Surveillance frequency based on exposure and regulatory guidance."
-    )
+    frequency: str = Field(..., description="Surveillance frequency based on exposure and regulatory guidance.")
     competence_required: str = Field(
         ..., description="Competence required to undertake and interpret this surveillance."
     )
@@ -99,9 +105,7 @@ class SurveillanceProvision(BaseModel):
         default=None,
         description="Statutory retention period for health records (e.g. COSHH: 40 years).",
     )
-    regulatory_basis: str = Field(
-        ..., description="The regulation, ACoP, or guidance underpinning this provision."
-    )
+    regulatory_basis: str = Field(..., description="The regulation, ACoP, or guidance underpinning this provision.")
     delegation_notes: str | None = Field(
         default=None,
         description="Governance notes on safe delegation and supervision requirements.",
@@ -112,6 +116,7 @@ class WorkflowStep(BaseModel):
     """A single step in a generated workflow."""
 
     order: int = Field(..., ge=1)
+    pdca_phase: PDCAPhase = PDCAPhase.DO
     component: WorkflowComponent
     description: str
     responsible_role: str = Field(
@@ -190,6 +195,7 @@ class WorkflowRequest(BaseModel):
 
     organisation: OrganisationProfile
     hazards: list[HazardProfile] = Field(..., min_length=1)
+    risk_assessment: RiskAssessmentConfirmation
     additional_context: str | None = Field(default=None, max_length=4096)
 
 
@@ -267,3 +273,82 @@ class BenchmarkResult(BaseModel):
     non_compliant_areas: list[str]
     recommendations: list[str]
     sources_cited: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# CHECK — Compliance Audit (replaces benchmark/gap-analysis endpoints)
+# ---------------------------------------------------------------------------
+
+
+class ComplianceAuditRequest(BaseModel):
+    organisation: OrganisationProfile
+    hazards: list[HazardProfile] = Field(..., min_length=1)
+
+
+class ComplianceAuditResponse(BaseModel):
+    """Structured compliance audit output (CHECK phase)."""
+
+    request_id: str
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    organisation_name: str
+    audit_items: list[AssuranceCheckItem] = Field(default_factory=list)
+    overall_rating: ComplianceRating = ComplianceRating.NOT_ASSESSED
+    employee_coverage_assessed: bool = False
+    interval_adherence_assessed: bool = False
+    governance_assessed: bool = False
+    sources_cited: list[str] = Field(default_factory=list)
+    model_used: str = ""
+
+
+# ---------------------------------------------------------------------------
+# REVIEW — Trend Analysis
+# ---------------------------------------------------------------------------
+
+
+class TrendAnalysisRequest(BaseModel):
+    organisation: OrganisationProfile
+    hazards: list[HazardProfile] = Field(..., min_length=1)
+    surveillance_summary: str = Field(
+        ...,
+        min_length=1,
+        description="Summary of anonymised surveillance data to analyse.",
+    )
+
+
+class TrendAnalysisResponse(BaseModel):
+    """Trend analysis output (REVIEW phase)."""
+
+    request_id: str
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    organisation_name: str
+    findings: list[TrendInsight] = Field(default_factory=list)
+    control_effectiveness_indicators: list[str] = Field(default_factory=list)
+    sources_cited: list[str] = Field(default_factory=list)
+    model_used: str = ""
+
+
+# ---------------------------------------------------------------------------
+# ACT — Improvement Plan
+# ---------------------------------------------------------------------------
+
+
+class ImprovementPlanRequest(BaseModel):
+    organisation: OrganisationProfile
+    hazards: list[HazardProfile] = Field(..., min_length=1)
+    surveillance_findings: str = Field(
+        ...,
+        min_length=1,
+        description="Summary of surveillance findings or trend analysis results.",
+    )
+
+
+class ImprovementPlanResponse(BaseModel):
+    """Improvement plan output (ACT phase)."""
+
+    request_id: str
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    organisation_name: str
+    actions: list[ImprovementAction] = Field(default_factory=list)
+    management_review_items: list[str] = Field(default_factory=list)
+    sources_cited: list[str] = Field(default_factory=list)
+    model_used: str = ""

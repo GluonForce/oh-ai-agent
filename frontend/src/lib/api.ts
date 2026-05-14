@@ -20,12 +20,18 @@ import type {
   AuditEntry,
   BenchmarkRequest,
   BenchmarkResult,
+  ComplianceAuditRequest,
+  ComplianceAuditResponse,
   GapAnalysis,
   HealthResponse,
+  ImprovementPlanRequest,
+  ImprovementPlanResponse,
   InfoResponse,
   IngestResponse,
   KnowledgeSource,
   KnowledgeStats,
+  TrendAnalysisRequest,
+  TrendAnalysisResponse,
   WorkflowRequest,
   WorkflowResponse,
 } from "./types";
@@ -77,4 +83,22 @@ export const api = {
 
   auditCount: () =>
     request<{ total_entries: number }>("/api/v1/audit/count"),
+
+  complianceAudit: (data: ComplianceAuditRequest) =>
+    request<ComplianceAuditResponse>("/api/v1/compliance-audit", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  trendAnalysis: (data: TrendAnalysisRequest) =>
+    request<TrendAnalysisResponse>("/api/v1/trend-analysis", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  improvementPlan: (data: ImprovementPlanRequest) =>
+    request<ImprovementPlanResponse>("/api/v1/improvement-plan", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };

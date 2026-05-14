@@ -3,23 +3,25 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Activity,
+  ArrowUpCircle,
   BookOpen,
   ClipboardCheck,
-  FileSearch,
   LayoutDashboard,
   ScrollText,
   Shield,
+  ShieldCheck,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/workflows", label: "PDCA Workflow", icon: ClipboardCheck },
-  { href: "/benchmark", label: "Benchmarking", icon: Activity },
-  { href: "/gap-analysis", label: "Gap Analysis", icon: FileSearch },
-  { href: "/knowledge", label: "Knowledge Base", icon: BookOpen },
-  { href: "/audit", label: "Audit Trail", icon: ScrollText },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, phase: undefined },
+  { href: "/workflows", label: "Workflow Generator", icon: ClipboardCheck, phase: "PLAN + DO" },
+  { href: "/compliance-audit", label: "Compliance Audit", icon: ShieldCheck, phase: "CHECK" },
+  { href: "/trend-analysis", label: "Trend Analysis", icon: TrendingUp, phase: "REVIEW" },
+  { href: "/improvement-plan", label: "Improvement Plan", icon: ArrowUpCircle, phase: "ACT" },
+  { href: "/knowledge", label: "Knowledge Base", icon: BookOpen, phase: undefined },
+  { href: "/audit", label: "Audit Trail", icon: ScrollText, phase: undefined },
 ];
 
 export function Sidebar() {
@@ -50,6 +52,9 @@ export function Sidebar() {
             >
               <item.icon className="h-4 w-4" />
               {item.label}
+              {item.phase && (
+                <span className="text-xs text-muted-foreground ml-auto">{item.phase}</span>
+              )}
             </Link>
           );
         })}

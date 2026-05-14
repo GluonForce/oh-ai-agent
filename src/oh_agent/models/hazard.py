@@ -100,3 +100,32 @@ class HazardProfile(BaseModel):
         description="Current control measures in place and their assessed reliability.",
     )
     notes: str | None = Field(default=None, max_length=2048)
+
+
+class RiskAssessmentConfirmation(BaseModel):
+    """Mandatory confirmation that duty holder has conducted risk assessment.
+
+    Per the PDCA spec (Section 4 — PLAN), the tool must require
+    confirmation before any OH workflow is generated.
+    """
+
+    risk_assessment_completed: bool = Field(
+        ...,
+        description=("Duty holder confirms suitable and sufficient risk assessment per Management Regulations."),
+    )
+    risk_assessment_date: str | None = Field(
+        default=None,
+        description="Date the risk assessment was last completed/reviewed.",
+    )
+    workers_consulted: bool = Field(
+        ...,
+        description=(
+            "Confirmation that workers have been consulted on perceived hazards and control practicality (HSWA duty)."
+        ),
+    )
+    assessor_name: str | None = Field(
+        default=None,
+        max_length=256,
+        description="Name or role of the person who conducted the risk assessment.",
+    )
+    additional_notes: str | None = Field(default=None, max_length=2048)
