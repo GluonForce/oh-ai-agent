@@ -73,14 +73,29 @@ class TestDisclaimers:
         for disclaimer in MANDATORY_DISCLAIMERS:
             assert result.count(disclaimer) == 1
 
+    def test_fourth_disclaimer_present(self) -> None:
+        assert len(MANDATORY_DISCLAIMERS) >= 4
+        assert "risk assessments" in MANDATORY_DISCLAIMERS[3].lower()
+
 
 class TestSystemPrompt:
     def test_guardrail_prompt_contains_hard_constraints(self) -> None:
-        assert "clinical decisions" in SYSTEM_GUARDRAIL_PROMPT.lower()
-        assert "medical advice" in SYSTEM_GUARDRAIL_PROMPT.lower()
-        assert "professional judgement" in SYSTEM_GUARDRAIL_PROMPT.lower()
-        assert "duty holders" in SYSTEM_GUARDRAIL_PROMPT.lower()
+        lower = SYSTEM_GUARDRAIL_PROMPT.lower()
+        assert "clinical diagnos" in lower
+        assert "medical advice" in lower
+        assert "professional judgement" in lower
+        assert "duty holder" in lower
 
     def test_guardrail_prompt_requires_sources(self) -> None:
         assert "HSE" in SYSTEM_GUARDRAIL_PROMPT
         assert "cite" in SYSTEM_GUARDRAIL_PROMPT.lower()
+
+    def test_guardrail_prompt_pdca_reference(self) -> None:
+        assert "Plan-Do-Check-Act" in SYSTEM_GUARDRAIL_PROMPT
+
+    def test_guardrail_prompt_new_boundaries(self) -> None:
+        lower = SYSTEM_GUARDRAIL_PROMPT.lower()
+        assert "risk assessments" in lower
+        assert "exposure monitoring" in lower
+        assert "ethical boundaries" in lower
+        assert "hswa 1974" in lower

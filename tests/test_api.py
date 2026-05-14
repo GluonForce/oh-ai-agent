@@ -27,7 +27,7 @@ class TestInfoEndpoint:
         data = resp.json()
         assert data["name"] == "OH AI Agent"
         assert "disclaimers" in data
-        assert len(data["disclaimers"]) >= 3
+        assert len(data["disclaimers"]) >= 4
 
 
 class TestKnowledgeEndpoints:
@@ -82,6 +82,30 @@ class TestWorkflowEndpointValidation:
         )
         assert resp.status_code == 422
 
+    def test_workflow_accepts_new_hazard_fields(self, client: TestClient) -> None:
+        resp = client.post(
+            "/api/v1/workflows",
+            json={
+                "organisation": {
+                    "name": "Test",
+                    "sector": "test",
+                    "risk_assessment_confirmed": True,
+                    "workers_consulted": True,
+                },
+                "hazards": [
+                    {
+                        "category": "chemical",
+                        "hazard_phrase": "H334",
+                        "exposure_duration": "medium",
+                        "potential_health_effects": "Asthma",
+                        "existing_controls": "LEV installed",
+                    }
+                ],
+            },
+        )
+        # Will fail with 502 (no real LLM), but validates that the model accepts the new fields
+        assert resp.status_code in (502, 401, 402, 200)
+
 
 class TestOpenAPISchema:
     def test_openapi_available(self, client: TestClient) -> None:
@@ -92,3 +116,12 @@ class TestOpenAPISchema:
         assert "/api/v1/workflows" in schema["paths"]
         assert "/api/v1/benchmark" in schema["paths"]
         assert "/api/v1/gap-analysis" in schema["paths"]
+
+    def test_openapi_pdca_models_present(self, client: TestClient) -> None:
+        resp = client.get("/openapi.json")
+        schema = resp.json()
+        components = schema.get("components", {}).get("schemas", {})
+        assert "SurveillanceProvision" in components
+        assert "RiskProfileSummary" in components
+        assert "AssuranceCheckItem" in components
+        assert "ImprovementAction" in components

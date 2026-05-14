@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from oh_agent.config import Settings
 from oh_agent.knowledge.retriever import KnowledgeRetriever
 from oh_agent.models.hazard import (
+    ExposureDuration,
     ExposureFrequency,
     ExposureLevel,
     HazardCategory,
@@ -59,6 +60,8 @@ def sample_organisation() -> OrganisationProfile:
         multi_site=False,
         delivery_model=DeliveryModel.OHN_LED,
         existing_surveillance="Annual questionnaires only, no biological monitoring",
+        risk_assessment_confirmed=True,
+        workers_consulted=True,
     )
 
 
@@ -71,6 +74,9 @@ def sample_hazards() -> list[HazardProfile]:
             substance_or_agent="water, detergents, solvents",
             exposure_level=ExposureLevel.HIGH,
             exposure_frequency=ExposureFrequency.CONTINUOUS,
+            exposure_duration=ExposureDuration.LONG,
+            potential_health_effects="Occupational contact dermatitis, skin sensitisation",
+            existing_controls="Gloves provided, limited compliance observed",
         ),
         HazardProfile(
             category=HazardCategory.CHEMICAL,
@@ -78,7 +84,10 @@ def sample_hazards() -> list[HazardProfile]:
             substance_or_agent="isocyanates",
             exposure_level=ExposureLevel.MODERATE,
             exposure_frequency=ExposureFrequency.FREQUENT,
+            exposure_duration=ExposureDuration.MEDIUM,
             workplace_exposure_limit="20 µg/m³ NCO (8-hr TWA)",
+            potential_health_effects="Occupational asthma, sensitisation",
+            existing_controls="LEV installed, RPE provided",
         ),
     ]
 

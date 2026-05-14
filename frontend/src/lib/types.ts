@@ -1,4 +1,4 @@
-// Domain types mirroring the Python Pydantic models
+// Domain types mirroring the Python Pydantic models — PDCA-aligned
 
 export type HazardCategory =
   | "chemical"
@@ -25,6 +25,13 @@ export type ExposureFrequency =
   | "frequent"
   | "continuous";
 
+export type ExposureDuration =
+  | "brief"
+  | "short"
+  | "medium"
+  | "long"
+  | "extended";
+
 export type DeliveryModel = "ohp_led" | "ohn_led" | "technician" | "mixed";
 
 export type WorkflowComponent =
@@ -40,6 +47,17 @@ export type WorkflowComponent =
   | "referral"
   | "review_appointment"
   | "record_keeping";
+
+export type SurveillanceType =
+  | "audiometry"
+  | "spirometry"
+  | "skin_check"
+  | "havs_questionnaire"
+  | "biological_monitoring"
+  | "vision_screening"
+  | "health_questionnaire"
+  | "clinical_examination"
+  | "fitness_assessment";
 
 export type ComplianceRating =
   | "compliant"
@@ -65,7 +83,10 @@ export interface HazardProfile {
   substance_or_agent?: string;
   exposure_level: ExposureLevel;
   exposure_frequency: ExposureFrequency;
+  exposure_duration: ExposureDuration;
   workplace_exposure_limit?: string;
+  potential_health_effects?: string;
+  existing_controls?: string;
   notes?: string;
 }
 
@@ -79,6 +100,29 @@ export interface OrganisationProfile {
   site_count: number;
   delivery_model: DeliveryModel;
   existing_surveillance?: string;
+  risk_assessment_confirmed: boolean;
+  workers_consulted: boolean;
+}
+
+// PDCA PLAN
+export interface RiskProfileSummary {
+  hazard_summary: string;
+  risk_assessment_confirmed: boolean;
+  workers_consulted: boolean;
+  key_risks: string[];
+  regulatory_drivers: string[];
+}
+
+// PDCA DO
+export interface SurveillanceProvision {
+  surveillance_type: SurveillanceType;
+  description: string;
+  frequency: string;
+  competence_required: string;
+  referral_pathway?: string;
+  retention_period?: string;
+  regulatory_basis: string;
+  delegation_notes?: string;
 }
 
 export interface WorkflowStep {
@@ -97,6 +141,32 @@ export interface GovernancePrompt {
   regulatory_reference: string;
 }
 
+// PDCA CHECK
+export interface AssuranceCheckItem {
+  area: string;
+  question: string;
+  status: ComplianceRating;
+  finding?: string;
+  recommendation?: string;
+  regulatory_reference?: string;
+}
+
+export interface TrendInsight {
+  area: string;
+  observation: string;
+  implication: string;
+  recommended_action?: string;
+}
+
+// PDCA ACT
+export interface ImprovementAction {
+  area: string;
+  action: string;
+  rationale: string;
+  priority: string;
+  regulatory_reference?: string;
+}
+
 export interface WorkflowRequest {
   organisation: OrganisationProfile;
   hazards: HazardProfile[];
@@ -108,7 +178,12 @@ export interface WorkflowResponse {
   generated_at: string;
   organisation_name: string;
   hazard_summary: string;
+  risk_profile?: RiskProfileSummary;
+  surveillance_provisions: SurveillanceProvision[];
   steps: WorkflowStep[];
+  assurance_checks: AssuranceCheckItem[];
+  trend_insights: TrendInsight[];
+  improvement_actions: ImprovementAction[];
   governance_prompts: GovernancePrompt[];
   sources_cited: string[];
   disclaimers: string[];

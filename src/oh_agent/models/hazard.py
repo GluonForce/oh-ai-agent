@@ -3,6 +3,14 @@
 Hazard classification follows the standardised hazard-phrase approach
 referenced in the spec, supplemented by additional logic to capture risks
 not adequately covered by existing H-phrase classifications.
+
+The risk profile is structured around five dimensions specified in the
+PDCA-aligned spec (Section 4 — PLAN):
+  1. Type of hazard
+  2. Level, duration, and frequency of exposure
+  3. Workforce characteristics (including vulnerability)
+  4. Potential health effects
+  5. Existing control measures and their reliability
 """
 
 from __future__ import annotations
@@ -46,8 +54,21 @@ class ExposureFrequency(StrEnum):
     CONTINUOUS = "continuous"
 
 
+class ExposureDuration(StrEnum):
+    """Typical duration of each exposure episode."""
+
+    BRIEF = "brief"  # minutes
+    SHORT = "short"  # up to 1 hour
+    MEDIUM = "medium"  # 1-4 hours
+    LONG = "long"  # 4-8 hours
+    EXTENDED = "extended"  # >8 hours / shift
+
+
 class HazardProfile(BaseModel):
-    """A single hazard with its risk-profiling attributes."""
+    """A single hazard with its risk-profiling attributes.
+
+    Aligned to PDCA Section 4 — risk profile dimensions.
+    """
 
     category: HazardCategory
     hazard_phrase: str = Field(
@@ -63,8 +84,19 @@ class HazardProfile(BaseModel):
     )
     exposure_level: ExposureLevel = ExposureLevel.MODERATE
     exposure_frequency: ExposureFrequency = ExposureFrequency.FREQUENT
+    exposure_duration: ExposureDuration = ExposureDuration.MEDIUM
     workplace_exposure_limit: str | None = Field(
         default=None,
         description="Published WEL or OEL if applicable.",
+    )
+    potential_health_effects: str | None = Field(
+        default=None,
+        max_length=1024,
+        description="Known or expected health effects from this hazard exposure.",
+    )
+    existing_controls: str | None = Field(
+        default=None,
+        max_length=1024,
+        description="Current control measures in place and their assessed reliability.",
     )
     notes: str | None = Field(default=None, max_length=2048)
