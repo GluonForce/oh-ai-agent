@@ -17,11 +17,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import type {
   DeliveryModel,
+  ExposureDuration,
   ExposureFrequency,
   ExposureLevel,
   HazardCategory,
   HazardProfile,
   OrganisationProfile,
+  RiskAssessmentConfirmation,
 } from "@/lib/types";
 
 const HAZARD_CATEGORIES: { value: HazardCategory; label: string }[] = [
@@ -52,6 +54,13 @@ const EXPOSURE_FREQUENCIES: { value: ExposureFrequency; label: string }[] = [
   { value: "continuous", label: "Continuous" },
 ];
 
+const EXPOSURE_DURATIONS: { value: ExposureDuration; label: string }[] = [
+  { value: "short_term", label: "Short Term" },
+  { value: "medium_term", label: "Medium Term" },
+  { value: "long_term", label: "Long Term" },
+  { value: "career_length", label: "Career Length" },
+];
+
 const DELIVERY_MODELS: { value: DeliveryModel; label: string }[] = [
   { value: "ohp_led", label: "OHP-led" },
   { value: "ohn_led", label: "OHN-led" },
@@ -66,6 +75,9 @@ function emptyHazard(): HazardProfile {
     substance_or_agent: "",
     exposure_level: "moderate",
     exposure_frequency: "frequent",
+    exposure_duration: undefined,
+    potential_health_effects: "",
+    existing_controls: "",
     workplace_exposure_limit: "",
     notes: "",
   };
@@ -75,10 +87,12 @@ interface OrgHazardFormProps {
   submitLabel: string;
   loading: boolean;
   showAdditionalContext?: boolean;
+  showRiskAssessment?: boolean;
   onSubmit: (
     org: OrganisationProfile,
     hazards: HazardProfile[],
-    additionalContext?: string
+    additionalContext?: string,
+    riskAssessment?: RiskAssessmentConfirmation
   ) => void;
 }
 
@@ -86,6 +100,7 @@ export function OrgHazardForm({
   submitLabel,
   loading,
   showAdditionalContext = false,
+  showRiskAssessment = false,
   onSubmit,
 }: OrgHazardFormProps) {
   const [org, setOrg] = useState<OrganisationProfile>({
@@ -102,6 +117,13 @@ export function OrgHazardForm({
   const [tasksText, setTasksText] = useState("");
   const [hazards, setHazards] = useState<HazardProfile[]>([emptyHazard()]);
   const [additionalContext, setAdditionalContext] = useState("");
+  const [riskAssessment, setRiskAssessment] = useState<RiskAssessmentConfirmation>({
+    risk_assessment_completed: false,
+    workers_consulted: false,
+    risk_assessment_date: "",
+    assessor_name: "",
+    additional_notes: "",
+  });
 
   const updateHazard = (idx: number, patch: Partial<HazardProfile>) => {
     setHazards((prev) =>
@@ -124,7 +146,12 @@ export function OrgHazardForm({
     };
     const cleanedHazards = hazards.filter((h) => h.hazard_phrase.trim());
     if (!finalOrg.name || !finalOrg.sector || cleanedHazards.length === 0) return;
-    onSubmit(finalOrg, cleanedHazards, additionalContext || undefined);
+    onSubmit(
+      finalOrg,
+      cleanedHazards,
+      additionalContext || undefined,
+      showRiskAssessment ? riskAssessment : undefined
+    );
   };
 
   return (
@@ -347,16 +374,40 @@ export function OrgHazardForm({
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <Label>Hazard Phrase *</Label>
-                  <Input
-                    value={hazard.hazard_phrase}
-                    onChange={(e) =>
-                      updateHazard(idx, { hazard_phrase: e.target.value })
-                    }
-                    placeholder="e.g. H334 — May cause allergy or asthma symptoms if inhaled"
-                    required
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Exposure Duration</Label>
+                    <Select
+                      value={hazard.exposure_duration ?? ""}
+                      onValueChange={(v) =>
+                        updateHazard(idx, {
+                          exposure_duration: v as ExposureDuration,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select duration" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXPOSURE_DURATIONS.map((d) => (
+                          <SelectItem key={d.value} value={d.value}>
+                            {d.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Hazard Phrase *</Label>
+                    <Input
+                      value={hazard.hazard_phrase}
+                      onChange={(e) =>
+                        updateHazard(idx, { hazard_phrase: e.target.value })
+                      }
+                      placeholder="e.g. H334 — May cause allergy or asthma symptoms if inhaled"
+                      required
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -384,6 +435,32 @@ export function OrgHazardForm({
                     />
                   </div>
                 </div>
+                <div className="space-y-1">
+                  <Label>Potential Health Effects</Label>
+                  <Textarea
+                    value={hazard.potential_health_effects ?? ""}
+                    onChange={(e) =>
+                      updateHazard(idx, {
+                        potential_health_effects: e.target.value,
+                      })
+                    }
+                    placeholder="Describe potential health effects of exposure"
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Existing Controls</Label>
+                  <Textarea
+                    value={hazard.existing_controls ?? ""}
+                    onChange={(e) =>
+                      updateHazard(idx, {
+                        existing_controls: e.target.value,
+                      })
+                    }
+                    placeholder="Describe existing control measures in place"
+                    rows={2}
+                  />
+                </div>
               </div>
             </div>
           ))}
@@ -402,6 +479,95 @@ export function OrgHazardForm({
               placeholder="Any additional context for the workflow generation..."
               rows={3}
             />
+          </CardContent>
+        </Card>
+      )}
+
+      {showRiskAssessment && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Risk Assessment Confirmation</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={riskAssessment.risk_assessment_completed}
+                  onChange={(e) =>
+                    setRiskAssessment({
+                      ...riskAssessment,
+                      risk_assessment_completed: e.target.checked,
+                    })
+                  }
+                  className="h-4 w-4 rounded border-input accent-primary"
+                />
+                <span className="text-sm font-medium">
+                  Risk assessment has been completed
+                </span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={riskAssessment.workers_consulted}
+                  onChange={(e) =>
+                    setRiskAssessment({
+                      ...riskAssessment,
+                      workers_consulted: e.target.checked,
+                    })
+                  }
+                  className="h-4 w-4 rounded border-input accent-primary"
+                />
+                <span className="text-sm font-medium">
+                  Workers have been consulted
+                </span>
+              </label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ra-date">Risk Assessment Date</Label>
+                <Input
+                  id="ra-date"
+                  type="date"
+                  value={riskAssessment.risk_assessment_date ?? ""}
+                  onChange={(e) =>
+                    setRiskAssessment({
+                      ...riskAssessment,
+                      risk_assessment_date: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assessor-name">Assessor Name</Label>
+                <Input
+                  id="assessor-name"
+                  value={riskAssessment.assessor_name ?? ""}
+                  onChange={(e) =>
+                    setRiskAssessment({
+                      ...riskAssessment,
+                      assessor_name: e.target.value,
+                    })
+                  }
+                  placeholder="e.g. Dr. Jane Smith"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ra-notes">Additional Notes</Label>
+              <Textarea
+                id="ra-notes"
+                value={riskAssessment.additional_notes ?? ""}
+                onChange={(e) =>
+                  setRiskAssessment({
+                    ...riskAssessment,
+                    additional_notes: e.target.value,
+                  })
+                }
+                placeholder="Any additional notes about the risk assessment..."
+                rows={2}
+              />
+            </div>
           </CardContent>
         </Card>
       )}

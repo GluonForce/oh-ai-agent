@@ -18,14 +18,17 @@ async function request<T>(
 // --- System ---
 import type {
   AuditEntry,
-  BenchmarkRequest,
-  BenchmarkResult,
-  GapAnalysis,
+  ComplianceAuditRequest,
+  ComplianceAuditResponse,
   HealthResponse,
+  ImprovementPlanRequest,
+  ImprovementPlanResponse,
   InfoResponse,
   IngestResponse,
   KnowledgeSource,
   KnowledgeStats,
+  TrendAnalysisRequest,
+  TrendAnalysisResponse,
   WorkflowRequest,
   WorkflowResponse,
 } from "./types";
@@ -40,14 +43,20 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  benchmark: (data: BenchmarkRequest) =>
-    request<BenchmarkResult>("/api/v1/benchmark", {
+  complianceAudit: (data: ComplianceAuditRequest) =>
+    request<ComplianceAuditResponse>("/api/v1/compliance-audit", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  gapAnalysis: (data: BenchmarkRequest) =>
-    request<GapAnalysis>("/api/v1/gap-analysis", {
+  trendAnalysis: (data: TrendAnalysisRequest) =>
+    request<TrendAnalysisResponse>("/api/v1/trend-analysis", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  improvementPlan: (data: ImprovementPlanRequest) =>
+    request<ImprovementPlanResponse>("/api/v1/improvement-plan", {
       method: "POST",
       body: JSON.stringify(data),
     }),

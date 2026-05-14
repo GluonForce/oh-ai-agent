@@ -25,6 +25,8 @@ import { api } from "@/lib/api";
 import type {
   HazardProfile,
   OrganisationProfile,
+  PDCAPhase,
+  RiskAssessmentConfirmation,
   WorkflowResponse,
 } from "@/lib/types";
 import { toast } from "sonner";
@@ -44,6 +46,21 @@ const COMPONENT_LABELS: Record<string, string> = {
   record_keeping: "Record Keeping",
 };
 
+function pdcaBadge(phase?: PDCAPhase) {
+  if (!phase) return null;
+  const styles: Record<PDCAPhase, string> = {
+    plan: "bg-blue-100 text-blue-800 border-blue-300",
+    do: "bg-green-100 text-green-800 border-green-300",
+    check: "bg-amber-100 text-amber-800 border-amber-300",
+    act: "bg-purple-100 text-purple-800 border-purple-300",
+  };
+  return (
+    <Badge variant="outline" className={styles[phase]}>
+      {phase.toUpperCase()}
+    </Badge>
+  );
+}
+
 export default function WorkflowsPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<WorkflowResponse | null>(null);
@@ -52,7 +69,8 @@ export default function WorkflowsPage() {
   const handleSubmit = async (
     org: OrganisationProfile,
     hazards: HazardProfile[],
-    additionalContext?: string
+    additionalContext?: string,
+    riskAssessment?: RiskAssessmentConfirmation
   ) => {
     setLoading(true);
     setError(null);
@@ -62,6 +80,10 @@ export default function WorkflowsPage() {
         organisation: org,
         hazards,
         additional_context: additionalContext,
+        risk_assessment: riskAssessment ?? {
+          risk_assessment_completed: false,
+          workers_consulted: false,
+        },
       });
       setResult(res);
       toast.success("Workflow generated successfully");
@@ -80,6 +102,7 @@ export default function WorkflowsPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <ClipboardCheck className="h-6 w-6" />
           Workflow Generator
+          <Badge variant="secondary" className="text-xs">PLAN + DO</Badge>
         </h1>
         <p className="text-muted-foreground mt-1">
           Generate hazard-specific, risk-profiled occupational health workflows
@@ -91,6 +114,7 @@ export default function WorkflowsPage() {
         submitLabel="Generate Workflow"
         loading={loading}
         showAdditionalContext
+        showRiskAssessment
         onSubmit={handleSubmit}
       />
 
@@ -105,6 +129,39 @@ export default function WorkflowsPage() {
       {result && (
         <div className="space-y-4">
           <Separator />
+
+          {/* Risk Assessment Confirmation Status */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Risk Assessment:</span>
+                  {result.risk_assessment_confirmed ? (
+                    <Badge className="bg-green-100 text-green-800 border-green-300" variant="outline">
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Confirmed
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-amber-100 text-amber-800 border-amber-300" variant="outline">
+                      Not Confirmed
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Workers Consulted:</span>
+                  {result.workers_consulted ? (
+                    <Badge className="bg-green-100 text-green-800 border-green-300" variant="outline">
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Yes
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-amber-100 text-amber-800 border-amber-300" variant="outline">
+                      No
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -131,6 +188,7 @@ export default function WorkflowsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12">#</TableHead>
+                    <TableHead>Phase</TableHead>
                     <TableHead>Component</TableHead>
                     <TableHead className="hidden lg:table-cell">
                       Description
@@ -147,6 +205,9 @@ export default function WorkflowsPage() {
                     <TableRow key={step.order}>
                       <TableCell className="font-medium">
                         {step.order}
+                      </TableCell>
+                      <TableCell>
+                        {pdcaBadge(step.pdca_phase)}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
@@ -171,6 +232,48 @@ export default function WorkflowsPage() {
               </Table>
             </CardContent>
           </Card>
+
+          {/* Surveillance Requirements */}
+          {result.surveillance_requirements && result.surveillance_requirements.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4" />
+                  Surveillance Requirements
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Frequency</TableHead>
+                      <TableHead className="hidden lg:table-cell">Competence</TableHead>
+                      <TableHead className="hidden md:table-cell">Regulatory Basis</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {result.surveillance_requirements.map((req, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <Badge variant="outline">{req.surveillance_type}</Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">{req.description}</TableCell>
+                        <TableCell className="text-sm">{req.frequency}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">
+                          {req.competence_required}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                          {req.regulatory_basis}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
 
           {result.governance_prompts.length > 0 && (
             <Card>
