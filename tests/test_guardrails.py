@@ -76,10 +76,11 @@ class TestDisclaimers:
 
 class TestSystemPrompt:
     def test_guardrail_prompt_contains_hard_constraints(self) -> None:
-        assert "clinical decisions" in SYSTEM_GUARDRAIL_PROMPT.lower()
-        assert "medical advice" in SYSTEM_GUARDRAIL_PROMPT.lower()
-        assert "professional judgement" in SYSTEM_GUARDRAIL_PROMPT.lower()
-        assert "duty holders" in SYSTEM_GUARDRAIL_PROMPT.lower()
+        lower = SYSTEM_GUARDRAIL_PROMPT.lower()
+        assert "clinical diagnoses" in lower
+        assert "professional judgement" in lower
+        assert "duty holder" in lower
+        assert "pdca" in lower
 
     def test_guardrail_prompt_requires_sources(self) -> None:
         assert "HSE" in SYSTEM_GUARDRAIL_PROMPT

@@ -25,6 +25,24 @@ export type ExposureFrequency =
   | "frequent"
   | "continuous";
 
+export type ExposureDuration =
+  | "short_term"
+  | "medium_term"
+  | "long_term"
+  | "career_length";
+
+export type PDCAPhase = "plan" | "do" | "check" | "act";
+
+export type SurveillanceType =
+  | "biological_monitoring"
+  | "clinical_assessment"
+  | "questionnaire"
+  | "lung_function"
+  | "audiometry"
+  | "skin_check"
+  | "vision_test"
+  | "fitness_assessment";
+
 export type DeliveryModel = "ohp_led" | "ohn_led" | "technician" | "mixed";
 
 export type WorkflowComponent =
@@ -59,12 +77,23 @@ export type AuditEventType =
   | "guardrail_triggered"
   | "error";
 
+export interface RiskAssessmentConfirmation {
+  risk_assessment_completed: boolean;
+  workers_consulted: boolean;
+  risk_assessment_date?: string;
+  assessor_name?: string;
+  additional_notes?: string;
+}
+
 export interface HazardProfile {
   category: HazardCategory;
   hazard_phrase: string;
   substance_or_agent?: string;
   exposure_level: ExposureLevel;
   exposure_frequency: ExposureFrequency;
+  exposure_duration?: ExposureDuration;
+  potential_health_effects?: string;
+  existing_controls?: string;
   workplace_exposure_limit?: string;
   notes?: string;
 }
@@ -81,6 +110,16 @@ export interface OrganisationProfile {
   existing_surveillance?: string;
 }
 
+export interface SurveillanceRequirement {
+  surveillance_type: SurveillanceType;
+  description: string;
+  frequency: string;
+  competence_required: string;
+  referral_pathway: string;
+  retention_period: string;
+  regulatory_basis: string;
+}
+
 export interface WorkflowStep {
   order: number;
   component: WorkflowComponent;
@@ -89,6 +128,7 @@ export interface WorkflowStep {
   frequency: string;
   regulatory_basis: string;
   delegation_notes?: string;
+  pdca_phase?: PDCAPhase;
 }
 
 export interface GovernancePrompt {
@@ -101,6 +141,7 @@ export interface WorkflowRequest {
   organisation: OrganisationProfile;
   hazards: HazardProfile[];
   additional_context?: string;
+  risk_assessment: RiskAssessmentConfirmation;
 }
 
 export interface WorkflowResponse {
@@ -114,26 +155,16 @@ export interface WorkflowResponse {
   disclaimers: string[];
   model_used: string;
   knowledge_chunks_used: number;
+  surveillance_requirements?: SurveillanceRequirement[];
+  risk_assessment_confirmed?: boolean;
+  workers_consulted?: boolean;
 }
 
-export interface BenchmarkRequest {
-  organisation: OrganisationProfile;
-  hazards: HazardProfile[];
-}
+// --- Compliance Audit (CHECK) ---
 
-export interface BenchmarkResult {
-  request_id: string;
-  generated_at: string;
-  organisation_name: string;
-  areas_assessed: string[];
-  compliant_areas: string[];
-  non_compliant_areas: string[];
-  recommendations: string[];
-  sources_cited: string[];
-}
-
-export interface GapItem {
+export interface ComplianceAuditItem {
   area: string;
+  question: string;
   current_state: string;
   required_state: string;
   rating: ComplianceRating;
@@ -141,14 +172,78 @@ export interface GapItem {
   regulatory_reference: string;
 }
 
-export interface GapAnalysis {
+export interface ComplianceAuditRequest {
+  organisation: OrganisationProfile;
+  hazards: HazardProfile[];
+}
+
+export interface ComplianceAuditResponse {
   request_id: string;
   generated_at: string;
   organisation_name: string;
-  gaps: GapItem[];
+  audit_items: ComplianceAuditItem[];
   overall_rating: ComplianceRating;
+  employee_coverage_assessed: boolean;
+  interval_adherence_assessed: boolean;
+  governance_assessed: boolean;
   sources_cited: string[];
+  model_used: string;
 }
+
+// --- Trend Analysis (REVIEW) ---
+
+export interface TrendFinding {
+  category: string;
+  description: string;
+  affected_area: string;
+  severity: string;
+  recommended_action: string;
+  regulatory_reference: string;
+}
+
+export interface TrendAnalysisRequest {
+  organisation: OrganisationProfile;
+  hazards: HazardProfile[];
+  surveillance_summary: string;
+}
+
+export interface TrendAnalysisResponse {
+  request_id: string;
+  generated_at: string;
+  organisation_name: string;
+  findings: TrendFinding[];
+  control_effectiveness_indicators: string[];
+  sources_cited: string[];
+  model_used: string;
+}
+
+// --- Improvement Plan (ACT) ---
+
+export interface ImprovementAction {
+  action_type: string;
+  description: string;
+  priority: string;
+  regulatory_basis: string;
+  expected_outcome: string;
+}
+
+export interface ImprovementPlanRequest {
+  organisation: OrganisationProfile;
+  hazards: HazardProfile[];
+  surveillance_findings: string;
+}
+
+export interface ImprovementPlanResponse {
+  request_id: string;
+  generated_at: string;
+  organisation_name: string;
+  actions: ImprovementAction[];
+  management_review_items: string[];
+  sources_cited: string[];
+  model_used: string;
+}
+
+// --- Knowledge & Audit ---
 
 export interface KnowledgeSource {
   id: string;
@@ -195,4 +290,5 @@ export interface InfoResponse {
   version: string;
   llm_model: string;
   disclaimers: string[];
+  framework?: string;
 }

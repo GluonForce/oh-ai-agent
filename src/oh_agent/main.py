@@ -1,12 +1,13 @@
-"""FastAPI application — OH AI Agent harness.
+"""FastAPI application — OH AI Agent harness (PDCA framework).
 
-Provides REST endpoints for:
-- Workflow generation (hazard-specific, risk-profiled)
-- Benchmarking against regulatory minimums
-- Gap analysis
+Provides REST endpoints structured around the PDCA cycle:
+- PLAN: Risk assessment confirmation + workflow generation
+- DO: Statutory OH provision (surveillance, competence, referrals)
+- CHECK: Compliance audit (employee coverage, intervals, governance)
+- REVIEW: Trend analysis of anonymised surveillance data
+- ACT: Improvement actions feeding back into risk management
 - Knowledge base management
 - Audit trail inspection
-- Health / readiness checks
 """
 
 from __future__ import annotations
@@ -19,9 +20,13 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from oh_agent.agents.benchmark_agent import BenchmarkAgent
+from oh_agent.agents.benchmark_agent import (
+    ComplianceAuditAgent,
+    ImprovementPlanAgent,
+    TrendAnalysisAgent,
+)
 from oh_agent.agents.guardrails import MANDATORY_DISCLAIMERS
 from oh_agent.agents.workflow_agent import WorkflowAgent
 from oh_agent.config import Settings, get_settings
@@ -30,11 +35,13 @@ from oh_agent.knowledge.retriever import KnowledgeRetriever
 from oh_agent.knowledge.sources import AUTHORITATIVE_SOURCES, KnowledgeSource
 from oh_agent.middleware.logging import RequestLoggingMiddleware
 from oh_agent.models.audit import AuditEntry
-from oh_agent.models.hazard import HazardProfile
-from oh_agent.models.organisation import OrganisationProfile
 from oh_agent.models.workflow import (
-    BenchmarkResult,
-    GapAnalysis,
+    ComplianceAuditRequest,
+    ComplianceAuditResponse,
+    ImprovementPlanRequest,
+    ImprovementPlanResponse,
+    TrendAnalysisRequest,
+    TrendAnalysisResponse,
     WorkflowRequest,
     WorkflowResponse,
 )
@@ -42,9 +49,6 @@ from oh_agent.services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Application state (populated during lifespan)
-# ---------------------------------------------------------------------------
 _state: dict[str, Any] = {}
 
 
@@ -66,16 +70,25 @@ def _get_audit() -> AuditService:
     return a  # type: ignore[return-value]
 
 
+def _handle_llm_error(exc: Exception) -> None:
+    msg = str(exc)
+    if "insufficient_quota" in msg or "exceeded" in msg.lower():
+        raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc
+    if "api key" in msg.lower() or "auth" in msg.lower():
+        raise HTTPException(401, f"LLM authentication failed: {msg}") from exc
+    if "risk assessment must be confirmed" in msg.lower() or "worker consultation" in msg.lower():
+        raise HTTPException(422, str(exc)) from exc
+    raise HTTPException(502, f"LLM request failed: {msg}") from exc
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Initialise shared services on startup."""
     settings = get_settings()
     logging.basicConfig(level=settings.log_level, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
     retriever = KnowledgeRetriever(settings)
     audit = AuditService(settings)
 
-    # Auto-ingest knowledge base on startup
     if settings.knowledge_dir.exists():
         count = ingest_directory(settings, retriever)
         logger.info("Ingested %d chunks from knowledge base on startup.", count)
@@ -91,10 +104,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="OH AI Agent",
-    version="0.1.0",
+    version="0.2.0",
     description=(
-        "Evidence-based, regulation-aligned occupational health workflow harness. "
-        "Designed for highly regulated UK healthcare environments."
+        "PDCA-structured occupational health workflow harness for regulated UK environments. "
+        "Plan → Do → Check → Act cycle for statutory OH compliance."
     ),
     lifespan=lifespan,
 )
@@ -110,7 +123,7 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# Health & info endpoints
+# Health & info
 # ---------------------------------------------------------------------------
 
 
@@ -138,20 +151,25 @@ async def info() -> dict[str, Any]:
     settings = _get_settings()
     return {
         "name": settings.api_title,
-        "version": settings.api_version,
+        "version": "0.2.0",
+        "framework": "PDCA (Plan-Do-Check-Act)",
         "llm_model": settings.llm_model,
         "disclaimers": MANDATORY_DISCLAIMERS,
     }
 
 
 # ---------------------------------------------------------------------------
-# Workflow endpoints
+# PLAN + DO — Workflow Generation
 # ---------------------------------------------------------------------------
 
 
-@app.post("/api/v1/workflows", response_model=WorkflowResponse, tags=["workflows"])
+@app.post("/api/v1/workflows", response_model=WorkflowResponse, tags=["plan-do"])
 async def generate_workflow(request: WorkflowRequest) -> WorkflowResponse:
-    """Generate a hazard-specific, risk-profiled OH workflow."""
+    """Generate a PDCA-structured statutory OH workflow.
+
+    Requires risk assessment confirmation and worker consultation
+    before any workflow is produced (PLAN gate).
+    """
     settings = _get_settings()
     retriever = _get_retriever()
     audit_svc = _get_audit()
@@ -160,78 +178,102 @@ async def generate_workflow(request: WorkflowRequest) -> WorkflowResponse:
     try:
         response, audit_entries = agent.generate(request)
     except Exception as exc:
-        msg = str(exc)
-        if "insufficient_quota" in msg or "exceeded" in msg.lower():
-            raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc
-        if "api key" in msg.lower() or "auth" in msg.lower():
-            raise HTTPException(401, f"LLM authentication failed: {msg}") from exc
-        raise HTTPException(502, f"LLM request failed: {msg}") from exc
+        _handle_llm_error(exc)
     audit_svc.log_many(audit_entries)
     return response
 
 
 # ---------------------------------------------------------------------------
-# Benchmark & gap analysis endpoints
+# CHECK — Compliance Audit
 # ---------------------------------------------------------------------------
 
 
-class BenchmarkRequest(BaseModel):
-    organisation: OrganisationProfile
-    hazards: list[HazardProfile] = Field(..., min_length=1)
+@app.post("/api/v1/compliance-audit", response_model=ComplianceAuditResponse, tags=["check"])
+async def compliance_audit(request: ComplianceAuditRequest) -> ComplianceAuditResponse:
+    """Evaluate statutory OH compliance (CHECK phase).
 
-
-@app.post("/api/v1/benchmark", response_model=BenchmarkResult, tags=["assurance"])
-async def benchmark(request: BenchmarkRequest) -> BenchmarkResult:
-    """Benchmark current practice against regulatory minimums."""
+    Assesses employee coverage, surveillance interval adherence,
+    and governance arrangements.
+    """
     settings = _get_settings()
     retriever = _get_retriever()
     audit_svc = _get_audit()
 
-    agent = BenchmarkAgent(settings=settings, retriever=retriever)
+    agent = ComplianceAuditAgent(settings=settings, retriever=retriever)
     try:
-        result, audit_entries = agent.benchmark(request.organisation, request.hazards)
+        result, audit_entries = agent.audit(request.organisation, request.hazards)
     except Exception as exc:
-        msg = str(exc)
-        if "insufficient_quota" in msg or "exceeded" in msg.lower():
-            raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc
-        raise HTTPException(502, f"LLM request failed: {msg}") from exc
-    audit_svc.log_many(audit_entries)
-    return result
-
-
-@app.post("/api/v1/gap-analysis", response_model=GapAnalysis, tags=["assurance"])
-async def gap_analysis(request: BenchmarkRequest) -> GapAnalysis:
-    """Perform structured gap analysis against regulatory requirements."""
-    settings = _get_settings()
-    retriever = _get_retriever()
-    audit_svc = _get_audit()
-
-    agent = BenchmarkAgent(settings=settings, retriever=retriever)
-    try:
-        result, audit_entries = agent.gap_analysis(request.organisation, request.hazards)
-    except Exception as exc:
-        msg = str(exc)
-        if "insufficient_quota" in msg or "exceeded" in msg.lower():
-            raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc
-        raise HTTPException(502, f"LLM request failed: {msg}") from exc
+        _handle_llm_error(exc)
     audit_svc.log_many(audit_entries)
     return result
 
 
 # ---------------------------------------------------------------------------
-# Knowledge management endpoints
+# REVIEW — Trend Analysis
 # ---------------------------------------------------------------------------
 
 
-@app.get("/api/v1/knowledge/sources", response_model=list[KnowledgeSource], tags=["knowledge"])
-async def list_sources() -> list[KnowledgeSource]:
-    """List pre-registered authoritative sources."""
-    return AUTHORITATIVE_SOURCES
+@app.post("/api/v1/trend-analysis", response_model=TrendAnalysisResponse, tags=["review"])
+async def trend_analysis(request: TrendAnalysisRequest) -> TrendAnalysisResponse:
+    """Analyse anonymised surveillance data for trends (REVIEW phase).
+
+    Identifies early illness signs, clusters, and control failure indicators.
+    """
+    settings = _get_settings()
+    retriever = _get_retriever()
+    audit_svc = _get_audit()
+
+    agent = TrendAnalysisAgent(settings=settings, retriever=retriever)
+    try:
+        result, audit_entries = agent.analyse(request.organisation, request.hazards, request.surveillance_summary)
+    except Exception as exc:
+        _handle_llm_error(exc)
+    audit_svc.log_many(audit_entries)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# ACT — Improvement Plan
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/v1/improvement-plan", response_model=ImprovementPlanResponse, tags=["act"])
+async def improvement_plan(request: ImprovementPlanRequest) -> ImprovementPlanResponse:
+    """Generate improvement actions from surveillance findings (ACT phase).
+
+    Outputs feed directly into duty holder's risk management system.
+    """
+    settings = _get_settings()
+    retriever = _get_retriever()
+    audit_svc = _get_audit()
+
+    agent = ImprovementPlanAgent(settings=settings, retriever=retriever)
+    try:
+        result, audit_entries = agent.plan(request.organisation, request.hazards, request.surveillance_findings)
+    except Exception as exc:
+        _handle_llm_error(exc)
+    audit_svc.log_many(audit_entries)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Knowledge management
+# ---------------------------------------------------------------------------
 
 
 class KnowledgeStats(BaseModel):
     total_chunks: int
     sources_registered: int
+
+
+class IngestResponse(BaseModel):
+    chunks_ingested: int
+    message: str
+
+
+@app.get("/api/v1/knowledge/sources", response_model=list[KnowledgeSource], tags=["knowledge"])
+async def list_sources() -> list[KnowledgeSource]:
+    return AUTHORITATIVE_SOURCES
 
 
 @app.get("/api/v1/knowledge/stats", response_model=KnowledgeStats, tags=["knowledge"])
@@ -243,18 +285,11 @@ async def knowledge_stats() -> KnowledgeStats:
     )
 
 
-class IngestResponse(BaseModel):
-    chunks_ingested: int
-    message: str
-
-
 @app.post("/api/v1/knowledge/ingest", response_model=IngestResponse, tags=["knowledge"])
 async def ingest_knowledge() -> IngestResponse:
-    """Re-ingest all documents from the knowledge_base directory."""
     settings = _get_settings()
     retriever = _get_retriever()
     audit_svc = _get_audit()
-
     count = ingest_directory(settings, retriever)
     audit_svc.log(
         AuditEntry(
@@ -267,24 +302,19 @@ async def ingest_knowledge() -> IngestResponse:
 
 @app.post("/api/v1/knowledge/upload", response_model=IngestResponse, tags=["knowledge"])
 async def upload_document(file: UploadFile) -> IngestResponse:
-    """Upload a single document to the knowledge base and ingest it."""
     settings = _get_settings()
     retriever = _get_retriever()
     audit_svc = _get_audit()
-
     if not file.filename:
         raise HTTPException(400, "Filename is required.")
-
     allowed = {".txt", ".md", ".docx"}
     suffix = Path(file.filename).suffix.lower()
     if suffix not in allowed:
         raise HTTPException(400, f"Unsupported file type '{suffix}'. Allowed: {allowed}")
-
     dest = settings.knowledge_dir / file.filename
     settings.knowledge_dir.mkdir(parents=True, exist_ok=True)
     content = await file.read()
     dest.write_bytes(content)
-
     count = ingest_directory(settings, retriever, directory=settings.knowledge_dir)
     audit_svc.log(
         AuditEntry(
@@ -296,13 +326,12 @@ async def upload_document(file: UploadFile) -> IngestResponse:
 
 
 # ---------------------------------------------------------------------------
-# Audit trail endpoints
+# Audit trail
 # ---------------------------------------------------------------------------
 
 
 @app.get("/api/v1/audit", response_model=list[AuditEntry], tags=["audit"])
 async def get_audit_trail(limit: int = 100) -> list[AuditEntry]:
-    """Retrieve recent audit trail entries."""
     audit_svc = _get_audit()
     entries = audit_svc.read_all()
     return entries[-limit:]

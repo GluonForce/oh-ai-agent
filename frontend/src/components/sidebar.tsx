@@ -3,21 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Activity,
+  ArrowUpCircle,
   BookOpen,
   ClipboardCheck,
-  FileSearch,
   LayoutDashboard,
   ScrollText,
   Shield,
+  ShieldCheck,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/workflows", label: "Workflow Generator", icon: ClipboardCheck },
-  { href: "/benchmark", label: "Benchmarking", icon: Activity },
-  { href: "/gap-analysis", label: "Gap Analysis", icon: FileSearch },
+  { href: "/workflows", label: "Workflow Generator", icon: ClipboardCheck, badge: "PLAN + DO" },
+  { href: "/compliance-audit", label: "Compliance Audit", icon: ShieldCheck, badge: "CHECK" },
+  { href: "/trend-analysis", label: "Trend Analysis", icon: TrendingUp, badge: "REVIEW" },
+  { href: "/improvement-plan", label: "Improvement Plan", icon: ArrowUpCircle, badge: "ACT" },
   { href: "/knowledge", label: "Knowledge Base", icon: BookOpen },
   { href: "/audit", label: "Audit Trail", icon: ScrollText },
 ];
@@ -49,7 +51,17 @@ export function Sidebar() {
               )}
             >
               <item.icon className="h-4 w-4" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {"badge" in item && item.badge && (
+                <span className={cn(
+                  "text-[10px] font-semibold px-1.5 py-0.5 rounded",
+                  active
+                    ? "bg-primary-foreground/20 text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                )}>
+                  {item.badge}
+                </span>
+              )}
             </Link>
           );
         })}

@@ -15,14 +15,23 @@ from uuid_extensions import uuid7
 
 
 class AuditEventType(StrEnum):
-    """Categories of auditable events."""
+    """Categories of auditable events, aligned to PDCA phases."""
 
+    # PLAN
+    RISK_ASSESSMENT_CONFIRMED = "risk_assessment_confirmed"
     WORKFLOW_REQUESTED = "workflow_requested"
+    # DO
     WORKFLOW_GENERATED = "workflow_generated"
-    BENCHMARK_REQUESTED = "benchmark_requested"
-    BENCHMARK_GENERATED = "benchmark_generated"
-    GAP_ANALYSIS_REQUESTED = "gap_analysis_requested"
-    GAP_ANALYSIS_GENERATED = "gap_analysis_generated"
+    # CHECK
+    COMPLIANCE_AUDIT_REQUESTED = "compliance_audit_requested"
+    COMPLIANCE_AUDIT_GENERATED = "compliance_audit_generated"
+    # REVIEW
+    TREND_ANALYSIS_REQUESTED = "trend_analysis_requested"
+    TREND_ANALYSIS_GENERATED = "trend_analysis_generated"
+    # ACT
+    IMPROVEMENT_PLAN_REQUESTED = "improvement_plan_requested"
+    IMPROVEMENT_PLAN_GENERATED = "improvement_plan_generated"
+    # Knowledge & system
     KNOWLEDGE_RETRIEVED = "knowledge_retrieved"
     DOCUMENT_INGESTED = "document_ingested"
     GUARDRAIL_TRIGGERED = "guardrail_triggered"

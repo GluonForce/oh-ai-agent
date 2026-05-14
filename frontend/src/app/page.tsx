@@ -153,6 +153,12 @@ export default function DashboardPage() {
                 <span className="text-muted-foreground">LLM Model</span>
                 <Badge variant="outline">{info.llm_model}</Badge>
               </div>
+              {info.framework && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Framework</span>
+                  <Badge variant="secondary">{info.framework}</Badge>
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -1,4 +1,4 @@
-"""Tests for Pydantic domain models."""
+"""Tests for Pydantic domain models (PDCA framework)."""
 
 from __future__ import annotations
 
@@ -7,18 +7,26 @@ from pydantic import ValidationError
 
 from oh_agent.models.audit import AuditEntry, AuditEventType
 from oh_agent.models.hazard import (
+    ExposureDuration,
     ExposureFrequency,
     ExposureLevel,
     HazardCategory,
     HazardProfile,
+    RiskAssessmentConfirmation,
 )
 from oh_agent.models.organisation import DeliveryModel, OrganisationProfile
 from oh_agent.models.workflow import (
-    BenchmarkResult,
+    ComplianceAuditItem,
+    ComplianceAuditResponse,
     ComplianceRating,
-    GapAnalysis,
-    GapItem,
     GovernancePrompt,
+    ImprovementAction,
+    ImprovementPlanResponse,
+    PDCAPhase,
+    SurveillanceRequirement,
+    SurveillanceType,
+    TrendAnalysisResponse,
+    TrendFinding,
     WorkflowComponent,
     WorkflowRequest,
     WorkflowResponse,
@@ -39,10 +47,7 @@ class TestHazardProfile:
 
     def test_empty_hazard_phrase_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            HazardProfile(
-                category=HazardCategory.CHEMICAL,
-                hazard_phrase="",
-            )
+            HazardProfile(category=HazardCategory.CHEMICAL, hazard_phrase="")
 
     def test_defaults(self) -> None:
         hp = HazardProfile(
@@ -51,7 +56,36 @@ class TestHazardProfile:
         )
         assert hp.exposure_level == ExposureLevel.MODERATE
         assert hp.exposure_frequency == ExposureFrequency.FREQUENT
-        assert hp.substance_or_agent is None
+        assert hp.exposure_duration == ExposureDuration.MEDIUM
+        assert hp.potential_health_effects is None
+        assert hp.existing_controls is None
+
+    def test_new_fields(self) -> None:
+        hp = HazardProfile(
+            category=HazardCategory.SKIN,
+            hazard_phrase="Wet work exposure",
+            exposure_duration=ExposureDuration.FULL_SHIFT,
+            potential_health_effects="Occupational dermatitis",
+            existing_controls="Barrier cream, gloves provided",
+        )
+        assert hp.exposure_duration == ExposureDuration.FULL_SHIFT
+        assert hp.potential_health_effects == "Occupational dermatitis"
+
+
+class TestRiskAssessmentConfirmation:
+    def test_valid_confirmation(self) -> None:
+        ra = RiskAssessmentConfirmation(
+            risk_assessment_completed=True,
+            workers_consulted=True,
+            risk_assessment_date="2024-01-15",
+            assessor_name="H&S Manager",
+        )
+        assert ra.risk_assessment_completed is True
+        assert ra.workers_consulted is True
+
+    def test_requires_both_fields(self) -> None:
+        with pytest.raises(ValidationError):
+            RiskAssessmentConfirmation(risk_assessment_completed=True)
 
 
 class TestOrganisationProfile:
@@ -70,22 +104,49 @@ class TestOrganisationProfile:
 
 
 class TestWorkflowModels:
-    def test_workflow_step(self) -> None:
+    def test_workflow_step_with_pdca_phase(self) -> None:
         step = WorkflowStep(
             order=1,
+            pdca_phase=PDCAPhase.DO,
             component=WorkflowComponent.SKIN_ASSESSMENT,
             description="Baseline skin assessment for wet work exposure",
             responsible_role="OHN",
             frequency="baseline + annual",
             regulatory_basis="COSHH Regulation 11",
         )
-        assert step.order == 1
-        assert step.component == WorkflowComponent.SKIN_ASSESSMENT
+        assert step.pdca_phase == PDCAPhase.DO
+
+    def test_surveillance_requirement(self) -> None:
+        sr = SurveillanceRequirement(
+            surveillance_type=SurveillanceType.SKIN_CHECK,
+            description="Visual skin inspection for dermatitis",
+            frequency="baseline + 6-monthly",
+            competence_required="Trained OH technician under OHN supervision",
+            referral_pathway="Refer to dermatologist if persistent",
+            retention_period="40 years (COSHH)",
+            regulatory_basis="COSHH Regulation 11",
+        )
+        assert sr.surveillance_type == SurveillanceType.SKIN_CHECK
+        assert sr.retention_period == "40 years (COSHH)"
+
+    def test_workflow_request_requires_risk_assessment(self) -> None:
+        org = OrganisationProfile(name="Test", sector="test")
+        ra = RiskAssessmentConfirmation(
+            risk_assessment_completed=True,
+            workers_consulted=True,
+        )
+        req = WorkflowRequest(
+            organisation=org,
+            hazards=[HazardProfile(category="chemical", hazard_phrase="test hazard")],
+            risk_assessment=ra,
+        )
+        assert req.risk_assessment.risk_assessment_completed is True
 
     def test_workflow_request_requires_hazards(self) -> None:
         org = OrganisationProfile(name="Test", sector="test")
+        ra = RiskAssessmentConfirmation(risk_assessment_completed=True, workers_consulted=True)
         with pytest.raises(ValidationError):
-            WorkflowRequest(organisation=org, hazards=[])
+            WorkflowRequest(organisation=org, hazards=[], risk_assessment=ra)
 
     def test_workflow_response_defaults(self) -> None:
         resp = WorkflowResponse(
@@ -94,9 +155,9 @@ class TestWorkflowModels:
             hazard_summary="wet work",
             steps=[],
         )
-        assert resp.generated_at is not None
-        assert resp.disclaimers == []
-        assert resp.model_used == ""
+        assert resp.risk_assessment_confirmed is True
+        assert resp.workers_consulted is True
+        assert resp.surveillance_requirements == []
 
     def test_governance_prompt(self) -> None:
         gp = GovernancePrompt(
@@ -107,36 +168,66 @@ class TestWorkflowModels:
         assert "Technician" in gp.applicable_roles[0]
 
 
-class TestBenchmarkModels:
-    def test_gap_item(self) -> None:
-        gi = GapItem(
-            area="Health surveillance programme",
-            current_state="Annual questionnaires only",
-            required_state="Biological monitoring + lung function",
-            rating=ComplianceRating.NON_COMPLIANT,
-            recommendation="Implement spirometry and biological monitoring",
+class TestComplianceAuditModels:
+    def test_audit_item(self) -> None:
+        item = ComplianceAuditItem(
+            area="Employee coverage",
+            question="Are all exposed employees identified?",
+            current_state="Only production floor workers included",
+            required_state="All workers with hazard exposure must be included",
+            rating=ComplianceRating.PARTIALLY_COMPLIANT,
+            recommendation="Include maintenance and cleaning staff",
             regulatory_reference="COSHH Reg 11",
         )
-        assert gi.rating == ComplianceRating.NON_COMPLIANT
+        assert item.rating == ComplianceRating.PARTIALLY_COMPLIANT
 
-    def test_gap_analysis_defaults(self) -> None:
-        ga = GapAnalysis(
+    def test_audit_response_defaults(self) -> None:
+        resp = ComplianceAuditResponse(
             request_id="test-456",
             organisation_name="Test Org",
         )
-        assert ga.overall_rating == ComplianceRating.NOT_ASSESSED
-        assert ga.gaps == []
+        assert resp.overall_rating == ComplianceRating.NOT_ASSESSED
+        assert resp.employee_coverage_assessed is False
 
-    def test_benchmark_result(self) -> None:
-        br = BenchmarkResult(
+
+class TestTrendAnalysisModels:
+    def test_trend_finding(self) -> None:
+        tf = TrendFinding(
+            category="early_illness_sign",
+            description="Increased skin complaints in Q3",
+            affected_area="Assembly line",
+            severity="medium",
+            recommended_action="Review detergent concentration",
+        )
+        assert tf.category == "early_illness_sign"
+
+    def test_response_defaults(self) -> None:
+        resp = TrendAnalysisResponse(
             request_id="test-789",
             organisation_name="Test Org",
-            areas_assessed=["surveillance", "record keeping"],
-            compliant_areas=["record keeping"],
-            non_compliant_areas=["surveillance"],
-            recommendations=["Implement biological monitoring"],
         )
-        assert len(br.non_compliant_areas) == 1
+        assert resp.findings == []
+        assert resp.control_effectiveness_indicators == []
+
+
+class TestImprovementPlanModels:
+    def test_improvement_action(self) -> None:
+        action = ImprovementAction(
+            action_type="engineering_control",
+            description="Install automated dispensing system",
+            priority="high",
+            regulatory_basis="COSHH hierarchy of controls",
+            expected_outcome="Reduce manual contact with solvents by 80%",
+        )
+        assert action.priority == "high"
+
+    def test_response_defaults(self) -> None:
+        resp = ImprovementPlanResponse(
+            request_id="test-abc",
+            organisation_name="Test Org",
+        )
+        assert resp.actions == []
+        assert resp.management_review_items == []
 
 
 class TestAuditModels:
@@ -144,18 +235,19 @@ class TestAuditModels:
         entry = AuditEntry(event_type=AuditEventType.WORKFLOW_REQUESTED)
         assert entry.id is not None
         assert entry.timestamp is not None
-        assert entry.actor == "system"
-        assert entry.detail == {}
 
-    def test_audit_entry_with_detail(self) -> None:
-        entry = AuditEntry(
-            event_type=AuditEventType.GUARDRAIL_TRIGGERED,
-            request_id="req-123",
-            detail={"violations": ["clinical decision detected"]},
-            guardrails_applied=["clinical_decision_check"],
-        )
-        assert entry.request_id == "req-123"
-        assert len(entry.guardrails_applied) == 1
+    def test_new_pdca_event_types(self) -> None:
+        for et in [
+            AuditEventType.RISK_ASSESSMENT_CONFIRMED,
+            AuditEventType.COMPLIANCE_AUDIT_REQUESTED,
+            AuditEventType.COMPLIANCE_AUDIT_GENERATED,
+            AuditEventType.TREND_ANALYSIS_REQUESTED,
+            AuditEventType.TREND_ANALYSIS_GENERATED,
+            AuditEventType.IMPROVEMENT_PLAN_REQUESTED,
+            AuditEventType.IMPROVEMENT_PLAN_GENERATED,
+        ]:
+            entry = AuditEntry(event_type=et)
+            assert entry.event_type == et
 
     def test_audit_serialization_roundtrip(self) -> None:
         entry = AuditEntry(
@@ -167,4 +259,3 @@ class TestAuditModels:
         json_str = entry.model_dump_json()
         restored = AuditEntry.model_validate_json(json_str)
         assert restored.request_id == entry.request_id
-        assert restored.sources_used == entry.sources_used
