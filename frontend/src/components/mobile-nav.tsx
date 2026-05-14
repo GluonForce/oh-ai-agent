@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/workflows", label: "Workflow Generator", icon: ClipboardCheck },
+  { href: "/workflows", label: "PDCA Workflow", icon: ClipboardCheck },
   { href: "/benchmark", label: "Benchmarking", icon: Activity },
   { href: "/gap-analysis", label: "Gap Analysis", icon: FileSearch },
   { href: "/knowledge", label: "Knowledge Base", icon: BookOpen },

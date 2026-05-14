@@ -15,8 +15,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import type {
   DeliveryModel,
+  ExposureDuration,
   ExposureFrequency,
   ExposureLevel,
   HazardCategory,
@@ -52,6 +54,14 @@ const EXPOSURE_FREQUENCIES: { value: ExposureFrequency; label: string }[] = [
   { value: "continuous", label: "Continuous" },
 ];
 
+const EXPOSURE_DURATIONS: { value: ExposureDuration; label: string }[] = [
+  { value: "brief", label: "Brief (minutes)" },
+  { value: "short", label: "Short (up to 1hr)" },
+  { value: "medium", label: "Medium (1–4hrs)" },
+  { value: "long", label: "Long (4–8hrs)" },
+  { value: "extended", label: "Extended (>8hrs)" },
+];
+
 const DELIVERY_MODELS: { value: DeliveryModel; label: string }[] = [
   { value: "ohp_led", label: "OHP-led" },
   { value: "ohn_led", label: "OHN-led" },
@@ -66,7 +76,10 @@ function emptyHazard(): HazardProfile {
     substance_or_agent: "",
     exposure_level: "moderate",
     exposure_frequency: "frequent",
+    exposure_duration: "medium",
     workplace_exposure_limit: "",
+    potential_health_effects: "",
+    existing_controls: "",
     notes: "",
   };
 }
@@ -98,6 +111,8 @@ export function OrgHazardForm({
     site_count: 1,
     delivery_model: "mixed",
     existing_surveillance: "",
+    risk_assessment_confirmed: false,
+    workers_consulted: false,
   });
   const [tasksText, setTasksText] = useState("");
   const [hazards, setHazards] = useState<HazardProfile[]>([emptyHazard()]);
@@ -131,7 +146,9 @@ export function OrgHazardForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Organisation Profile</CardTitle>
+          <CardTitle className="text-base">
+            PLAN — Organisation &amp; Risk Profile
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -222,14 +239,16 @@ export function OrgHazardForm({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="workforce-chars">Workforce Characteristics</Label>
+            <Label htmlFor="workforce-chars">
+              Workforce Characteristics (incl. vulnerability)
+            </Label>
             <Input
               id="workforce-chars"
               value={org.workforce_characteristics ?? ""}
               onChange={(e) =>
                 setOrg({ ...org, workforce_characteristics: e.target.value })
               }
-              placeholder="e.g. shift workers, mixed age demographics"
+              placeholder="e.g. shift workers, mixed age, includes vulnerable groups"
             />
           </div>
           <div className="space-y-2">
@@ -243,6 +262,36 @@ export function OrgHazardForm({
               placeholder="Describe current health surveillance arrangements"
               rows={2}
             />
+          </div>
+          <Separator />
+          <div className="space-y-3">
+            <p className="text-sm font-medium">PLAN Confirmations</p>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="risk-assessment"
+                checked={org.risk_assessment_confirmed}
+                onCheckedChange={(v) =>
+                  setOrg({ ...org, risk_assessment_confirmed: v === true })
+                }
+              />
+              <Label htmlFor="risk-assessment" className="text-sm font-normal">
+                A suitable and sufficient risk assessment has been undertaken
+                (Management Regulations)
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="workers-consulted"
+                checked={org.workers_consulted}
+                onCheckedChange={(v) =>
+                  setOrg({ ...org, workers_consulted: v === true })
+                }
+              />
+              <Label htmlFor="workers-consulted" className="text-sm font-normal">
+                Workers have been consulted on perceived hazards and practicality
+                of controls (HSWA duty)
+              </Label>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -279,7 +328,7 @@ export function OrgHazardForm({
                     </Button>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div className="space-y-1">
                     <Label>Category</Label>
                     <Select
@@ -346,6 +395,28 @@ export function OrgHazardForm({
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1">
+                    <Label>Duration</Label>
+                    <Select
+                      value={hazard.exposure_duration}
+                      onValueChange={(v) =>
+                        updateHazard(idx, {
+                          exposure_duration: v as ExposureDuration,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXPOSURE_DURATIONS.map((d) => (
+                          <SelectItem key={d.value} value={d.value}>
+                            {d.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label>Hazard Phrase *</Label>
@@ -383,6 +454,30 @@ export function OrgHazardForm({
                       placeholder="e.g. 20 µg/m³ NCO (8-hr TWA)"
                     />
                   </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Potential Health Effects</Label>
+                  <Input
+                    value={hazard.potential_health_effects ?? ""}
+                    onChange={(e) =>
+                      updateHazard(idx, {
+                        potential_health_effects: e.target.value,
+                      })
+                    }
+                    placeholder="e.g. Occupational asthma, sensitisation"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Existing Control Measures</Label>
+                  <Input
+                    value={hazard.existing_controls ?? ""}
+                    onChange={(e) =>
+                      updateHazard(idx, {
+                        existing_controls: e.target.value,
+                      })
+                    }
+                    placeholder="e.g. LEV installed, RPE provided, limited compliance"
+                  />
                 </div>
               </div>
             </div>

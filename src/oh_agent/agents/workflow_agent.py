@@ -1,8 +1,9 @@
-"""Workflow generation agent.
+"""Workflow generation agent — PDCA-aligned.
 
 Generates hazard-specific, risk-profiled, evidence-based OH workflows
-by combining organisation profile + hazard data with knowledge-base
-retrieval and LLM reasoning, then applying compliance guardrails.
+structured around Plan-Do-Check-Act, by combining organisation profile
++ hazard data with knowledge-base retrieval and LLM reasoning, then
+applying compliance guardrails.
 """
 
 from __future__ import annotations
@@ -23,7 +24,12 @@ from oh_agent.config import Settings
 from oh_agent.knowledge.retriever import KnowledgeRetriever, RetrievedChunk
 from oh_agent.models.audit import AuditEntry, AuditEventType
 from oh_agent.models.workflow import (
+    AssuranceCheckItem,
     GovernancePrompt,
+    ImprovementAction,
+    RiskProfileSummary,
+    SurveillanceProvision,
+    TrendInsight,
     WorkflowRequest,
     WorkflowResponse,
     WorkflowStep,
@@ -32,8 +38,8 @@ from oh_agent.models.workflow import (
 logger = logging.getLogger(__name__)
 
 _WORKFLOW_USER_TEMPLATE = """\
-Generate a compliant occupational health workflow for the following \
-organisation and hazard profile.
+Generate a PDCA-structured (Plan-Do-Check-Act) occupational health \
+workflow for the following organisation and hazard profile.
 
 ## Organisation
 - Name: {org_name}
@@ -44,6 +50,8 @@ organisation and hazard profile.
 - Delivery model: {delivery_model}
 - Workforce characteristics: {workforce_chars}
 - Existing surveillance: {existing_surveillance}
+- Risk assessment confirmed: {risk_assessment_confirmed}
+- Workers consulted: {workers_consulted}
 
 ## Hazards
 {hazards_block}
@@ -54,23 +62,63 @@ organisation and hazard profile.
 ## Retrieved knowledge (use these as evidence basis)
 {knowledge_context}
 
-## Instructions
-1. Generate a step-by-step workflow with each step containing:
-   - order (integer)
-   - component (one of: health_questionnaire, clinical_assessment, \
-biological_monitoring, lung_function_test, audiometry, \
-skin_assessment, vision_screening, fitness_for_task, \
-health_education, referral, review_appointment, record_keeping)
-   - description
-   - responsible_role (e.g. OHP, OHN, OH Technician)
-   - frequency (e.g. baseline + annual)
-   - regulatory_basis (specific regulation/guidance)
-   - delegation_notes (if applicable)
-2. Include governance prompts for safe delegation.
-3. Cite all sources used.
-4. Respond ONLY with valid JSON matching this schema:
+## Instructions — PDCA Framework
+Generate a structured workflow following Plan-Do-Check-Act. Respond \
+ONLY with valid JSON matching this schema:
+
 {{
-  "steps": [...],
+  "risk_profile": {{
+    "hazard_summary": "...",
+    "risk_assessment_confirmed": true/false,
+    "workers_consulted": true/false,
+    "key_risks": ["..."],
+    "regulatory_drivers": ["e.g. COSHH Reg 11", "Control of Noise at Work Regs 2005"]
+  }},
+  "surveillance_provisions": [{{
+    "surveillance_type": "audiometry|spirometry|skin_check|havs_questionnaire|\
+biological_monitoring|vision_screening|health_questionnaire|clinical_examination|\
+fitness_assessment",
+    "description": "...",
+    "frequency": "e.g. baseline + annual",
+    "competence_required": "e.g. qualified OHN with audiometry training",
+    "referral_pathway": "e.g. refer to OHP if abnormal findings",
+    "retention_period": "e.g. 40 years (COSHH)",
+    "regulatory_basis": "specific regulation/guidance",
+    "delegation_notes": "if applicable"
+  }}],
+  "steps": [{{
+    "order": 1,
+    "component": "health_questionnaire|clinical_assessment|\
+biological_monitoring|lung_function_test|audiometry|skin_assessment|\
+vision_screening|fitness_for_task|health_education|referral|\
+review_appointment|record_keeping",
+    "description": "...",
+    "responsible_role": "e.g. OHP, OHN, OH Technician",
+    "frequency": "e.g. baseline + annual",
+    "regulatory_basis": "specific regulation/guidance",
+    "delegation_notes": "if applicable"
+  }}],
+  "assurance_checks": [{{
+    "area": "e.g. Employee coverage",
+    "question": "Have all exposed employees been identified and included?",
+    "status": "not_assessed",
+    "finding": null,
+    "recommendation": "...",
+    "regulatory_reference": "..."
+  }}],
+  "trend_insights": [{{
+    "area": "...",
+    "observation": "...",
+    "implication": "...",
+    "recommended_action": "..."
+  }}],
+  "improvement_actions": [{{
+    "area": "...",
+    "action": "...",
+    "rationale": "...",
+    "priority": "high|medium|low",
+    "regulatory_reference": "..."
+  }}],
   "governance_prompts": [{{"prompt_text": "...", "applicable_roles": [...], "regulatory_reference": "..."}}],
   "sources_cited": [...]
 }}"""
@@ -81,12 +129,17 @@ def _build_hazards_block(request: WorkflowRequest) -> str:
     for i, h in enumerate(request.hazards, 1):
         lines.append(
             f"{i}. [{h.category.value}] {h.hazard_phrase} "
-            f"(exposure: {h.exposure_level.value}, frequency: {h.exposure_frequency.value})"
+            f"(exposure: {h.exposure_level.value}, frequency: {h.exposure_frequency.value}, "
+            f"duration: {h.exposure_duration.value})"
         )
         if h.substance_or_agent:
             lines.append(f"   Substance/agent: {h.substance_or_agent}")
         if h.workplace_exposure_limit:
             lines.append(f"   WEL: {h.workplace_exposure_limit}")
+        if h.potential_health_effects:
+            lines.append(f"   Potential health effects: {h.potential_health_effects}")
+        if h.existing_controls:
+            lines.append(f"   Existing controls: {h.existing_controls}")
     return "\n".join(lines)
 
 
@@ -110,7 +163,7 @@ def _parse_llm_response(raw: str) -> dict[str, Any]:
 
 
 class WorkflowAgent:
-    """Generates OH workflows via LLM + RAG with guardrails."""
+    """Generates PDCA-structured OH workflows via LLM + RAG with guardrails."""
 
     def __init__(
         self,
@@ -128,7 +181,7 @@ class WorkflowAgent:
             self._client = create_llm_client(settings)
 
     def generate(self, request: WorkflowRequest) -> tuple[WorkflowResponse, list[AuditEntry]]:
-        """Generate a workflow and return it with its audit trail."""
+        """Generate a PDCA workflow and return it with its audit trail."""
         request_id = str(uuid7())
         audit_entries: list[AuditEntry] = []
 
@@ -165,6 +218,8 @@ class WorkflowAgent:
             delivery_model=org.delivery_model.value,
             workforce_chars=org.workforce_characteristics or "Not specified",
             existing_surveillance=org.existing_surveillance or "None described",
+            risk_assessment_confirmed=org.risk_assessment_confirmed,
+            workers_consulted=org.workers_consulted,
             hazards_block=_build_hazards_block(request),
             additional_context=request.additional_context or "None",
             knowledge_context=_build_knowledge_context(chunks),
@@ -218,17 +273,35 @@ class WorkflowAgent:
             )
             raise ValueError(f"LLM returned unparseable response: {exc}") from exc
 
+        # PLAN
+        risk_profile_data = parsed.get("risk_profile")
+        risk_profile = RiskProfileSummary(**risk_profile_data) if risk_profile_data else None
+
+        # DO
+        surveillance = [SurveillanceProvision(**s) for s in parsed.get("surveillance_provisions", [])]
         steps = [WorkflowStep(**s) for s in parsed.get("steps", [])]
         governance = [GovernancePrompt(**g) for g in parsed.get("governance_prompts", [])]
-        sources = parsed.get("sources_cited", [])
 
+        # CHECK
+        assurance = [AssuranceCheckItem(**a) for a in parsed.get("assurance_checks", [])]
+        trends = [TrendInsight(**t) for t in parsed.get("trend_insights", [])]
+
+        # ACT
+        improvements = [ImprovementAction(**ia) for ia in parsed.get("improvement_actions", [])]
+
+        sources = parsed.get("sources_cited", [])
         hazard_summary = "; ".join(h.hazard_phrase for h in request.hazards)
 
         response = WorkflowResponse(
             request_id=request_id,
             organisation_name=org.name,
             hazard_summary=hazard_summary,
+            risk_profile=risk_profile,
+            surveillance_provisions=surveillance,
             steps=steps,
+            assurance_checks=assurance,
+            trend_insights=trends,
+            improvement_actions=improvements,
             governance_prompts=governance,
             sources_cited=sources,
             disclaimers=list(append_disclaimers("").replace("\n\n---\n**Important Notices:**\n", "").split("\n- ")),
@@ -240,7 +313,13 @@ class WorkflowAgent:
             AuditEntry(
                 event_type=AuditEventType.WORKFLOW_GENERATED,
                 request_id=request_id,
-                detail={"steps_count": len(steps), "sources_cited": sources},
+                detail={
+                    "steps_count": len(steps),
+                    "surveillance_provisions_count": len(surveillance),
+                    "assurance_checks_count": len(assurance),
+                    "improvement_actions_count": len(improvements),
+                    "sources_cited": sources,
+                },
                 sources_used=sources,
                 model_used=self._settings.llm_model,
                 guardrails_applied=(guardrail_result.violations if not guardrail_result.passed else []),

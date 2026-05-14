@@ -1,7 +1,8 @@
-"""Benchmarking and gap-analysis agent.
+"""Benchmarking and gap-analysis agent — PDCA CHECK phase.
 
 Compares an organisation's current OH practice against regulatory
-minimum requirements and generates actionable findings.
+minimum requirements using the Plan-Do-Check-Act framework and
+generates actionable findings.
 """
 
 from __future__ import annotations
@@ -30,13 +31,15 @@ logger = logging.getLogger(__name__)
 
 _BENCHMARK_PROMPT = """\
 Benchmark the following organisation's occupational health practice \
-against UK regulatory minimum requirements.
+against UK regulatory minimum requirements using a PDCA framework.
 
 ## Organisation
 - Name: {org_name}
 - Sector: {sector}
 - Delivery model: {delivery_model}
 - Existing surveillance: {existing_surveillance}
+- Risk assessment confirmed: {risk_assessment_confirmed}
+- Workers consulted: {workers_consulted}
 
 ## Hazards
 {hazards_block}
@@ -45,9 +48,13 @@ against UK regulatory minimum requirements.
 {knowledge_context}
 
 ## Instructions
-Assess compliance across these areas: health surveillance programme, \
-risk assessment integration, record keeping, competency and delegation, \
-referral pathways, and worker communication.
+Assess compliance across these areas, aligned to PDCA phases:
+- PLAN: risk assessment adequacy, risk profiling, worker consultation
+- DO: health surveillance programme, surveillance frequency, competence \
+and delegation, referral pathways, record keeping and retention periods
+- CHECK: employee coverage, interval compliance, governance and oversight, \
+trend analysis capability
+- ACT: control measure review processes, management review, training
 
 Respond ONLY with valid JSON:
 {{
@@ -60,13 +67,16 @@ Respond ONLY with valid JSON:
 
 _GAP_ANALYSIS_PROMPT = """\
 Perform a structured gap analysis of the following organisation's \
-occupational health arrangements against UK regulatory requirements.
+occupational health arrangements against UK regulatory requirements, \
+using a PDCA framework.
 
 ## Organisation
 - Name: {org_name}
 - Sector: {sector}
 - Delivery model: {delivery_model}
 - Existing surveillance: {existing_surveillance}
+- Risk assessment confirmed: {risk_assessment_confirmed}
+- Workers consulted: {workers_consulted}
 
 ## Hazards
 {hazards_block}
@@ -76,7 +86,7 @@ occupational health arrangements against UK regulatory requirements.
 
 ## Instructions
 For each gap found, provide:
-- area: the compliance area
+- area: the compliance area (prefix with PDCA phase: PLAN/DO/CHECK/ACT)
 - current_state: what the organisation currently does
 - required_state: what UK regulations require
 - rating: one of "compliant", "partially_compliant", "non_compliant"
@@ -101,11 +111,19 @@ Respond ONLY with valid JSON:
 
 
 def _format_hazards(hazards: list[HazardProfile]) -> str:
-    return "\n".join(
-        f"- [{h.category.value}] {h.hazard_phrase} "
-        f"(exposure: {h.exposure_level.value}, freq: {h.exposure_frequency.value})"
-        for h in hazards
-    )
+    lines: list[str] = []
+    for h in hazards:
+        line = (
+            f"- [{h.category.value}] {h.hazard_phrase} "
+            f"(exposure: {h.exposure_level.value}, freq: {h.exposure_frequency.value}, "
+            f"duration: {h.exposure_duration.value})"
+        )
+        lines.append(line)
+        if h.potential_health_effects:
+            lines.append(f"  Health effects: {h.potential_health_effects}")
+        if h.existing_controls:
+            lines.append(f"  Controls: {h.existing_controls}")
+    return "\n".join(lines)
 
 
 def _format_knowledge(chunks: list[RetrievedChunk]) -> str:
@@ -124,7 +142,7 @@ def _parse_json(raw: str) -> dict[str, Any]:
 
 
 class BenchmarkAgent:
-    """Assesses current OH practice against regulatory minimums."""
+    """Assesses current OH practice against regulatory minimums using PDCA."""
 
     def __init__(
         self,
@@ -169,6 +187,8 @@ class BenchmarkAgent:
             sector=organisation.sector,
             delivery_model=organisation.delivery_model.value,
             existing_surveillance=organisation.existing_surveillance or "None described",
+            risk_assessment_confirmed=organisation.risk_assessment_confirmed,
+            workers_consulted=organisation.workers_consulted,
             hazards_block=_format_hazards(hazards),
             knowledge_context=_format_knowledge(chunks),
         )
@@ -230,6 +250,8 @@ class BenchmarkAgent:
             sector=organisation.sector,
             delivery_model=organisation.delivery_model.value,
             existing_surveillance=organisation.existing_surveillance or "None described",
+            risk_assessment_confirmed=organisation.risk_assessment_confirmed,
+            workers_consulted=organisation.workers_consulted,
             hazards_block=_format_hazards(hazards),
             knowledge_context=_format_knowledge(chunks),
         )

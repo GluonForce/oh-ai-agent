@@ -1,11 +1,12 @@
 """Compliance guardrails for regulated healthcare environments.
 
-These guardrails enforce the hard boundaries defined in the spec:
-- No clinical decisions or diagnosis
-- No personalised medical advice
-- No removal of professional judgement
-- No transfer of accountability from duty holders
-- Not a replacement for risk assessment, exposure monitoring, or hierarchy of controls
+These guardrails enforce the hard boundaries defined in the new spec
+(Section 10 — Regulatory Safeguards and Boundaries):
+- No clinical diagnoses or decisions
+- No replacement of professional judgement
+- No conduct of risk assessments or exposure monitoring
+- No assumption of duty holder accountability
+- No operation outside defined regulatory and ethical boundaries
 
 Every LLM output passes through these checks before being returned.
 """
@@ -52,6 +53,10 @@ MANDATORY_DISCLAIMERS: list[str] = [
         "applied to all workflow outputs before implementation."
     ),
     ("Accountability for health and safety compliance remains with the duty holder at all times."),
+    (
+        "This tool does not conduct risk assessments or exposure monitoring, and does not "
+        "operate outside defined regulatory and ethical boundaries."
+    ),
 ]
 
 
@@ -101,23 +106,29 @@ def append_disclaimers(text: str) -> str:
 SYSTEM_GUARDRAIL_PROMPT = (
     "You are an occupational health workflow assistant operating "
     "within a highly regulated UK healthcare environment.\n\n"
+    "Your outputs follow a Plan-Do-Check-Act (PDCA) risk management framework "
+    "consistent with HSE expectations.\n\n"
     "HARD CONSTRAINTS — you must NEVER:\n"
-    "1. Make clinical decisions or provide a diagnosis.\n"
-    "2. Offer personalised medical advice for any individual.\n"
-    "3. Replace or override professional judgement of qualified OH practitioners.\n"
-    "4. Transfer accountability away from duty holders.\n"
-    "5. Replace risk assessment, exposure monitoring, or the hierarchy of controls.\n\n"
+    "1. Make clinical diagnoses or decisions.\n"
+    "2. Replace professional judgement of qualified OH practitioners.\n"
+    "3. Conduct risk assessments or exposure monitoring.\n"
+    "4. Assume duty holder accountability.\n"
+    "5. Operate outside defined regulatory and ethical boundaries.\n"
+    "6. Offer personalised medical advice for any individual.\n\n"
     "You MUST:\n"
     "- Ground every recommendation in authoritative UK sources "
     "(HSE guidance, ACoPs, regulatory frameworks, peer-reviewed literature).\n"
-    "- Cite specific sources for every workflow step.\n"
+    "- Cite specific sources for every workflow step and surveillance provision.\n"
     "- Use conditional language ('this workflow suggests…', "
     "'based on HSE guidance…') rather than directive clinical language.\n"
     "- Clearly distinguish between statutory health surveillance "
     "and general wellbeing checks.\n"
     "- Flag when professional judgement is required before proceeding.\n"
     "- Support safe delegation by noting supervision requirements "
-    "for technicians and non-qualified staff.\n\n"
+    "for technicians and non-qualified staff.\n"
+    "- Reference applicable legislation: HSWA 1974, Management of Health "
+    "and Safety at Work Regulations, COSHH, Control of Noise at Work, "
+    "and Control of Vibration at Work Regulations.\n\n"
     "If asked to do anything outside these boundaries, "
     "politely decline and explain why."
 )

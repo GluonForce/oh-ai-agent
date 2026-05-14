@@ -1,4 +1,8 @@
-"""Workflow, benchmarking, and gap-analysis models."""
+"""Workflow, benchmarking, and gap-analysis models — PDCA-aligned.
+
+The workflow response is structured around the Plan-Do-Check-Act
+framework consistent with HSE expectations for health risk management.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +15,7 @@ from oh_agent.models.hazard import HazardProfile
 from oh_agent.models.organisation import OrganisationProfile
 
 # ---------------------------------------------------------------------------
-# Workflow
+# Shared enumerations
 # ---------------------------------------------------------------------------
 
 
@@ -30,6 +34,78 @@ class WorkflowComponent(StrEnum):
     REFERRAL = "referral"
     REVIEW_APPOINTMENT = "review_appointment"
     RECORD_KEEPING = "record_keeping"
+
+
+class SurveillanceType(StrEnum):
+    """Types of health surveillance/monitoring (PDCA DO phase)."""
+
+    AUDIOMETRY = "audiometry"
+    SPIROMETRY = "spirometry"
+    SKIN_CHECK = "skin_check"
+    HAVS_QUESTIONNAIRE = "havs_questionnaire"
+    BIOLOGICAL_MONITORING = "biological_monitoring"
+    VISION_SCREENING = "vision_screening"
+    HEALTH_QUESTIONNAIRE = "health_questionnaire"
+    CLINICAL_EXAMINATION = "clinical_examination"
+    FITNESS_ASSESSMENT = "fitness_assessment"
+
+
+class ComplianceRating(StrEnum):
+    COMPLIANT = "compliant"
+    PARTIALLY_COMPLIANT = "partially_compliant"
+    NON_COMPLIANT = "non_compliant"
+    NOT_ASSESSED = "not_assessed"
+
+
+# ---------------------------------------------------------------------------
+# PDCA — PLAN phase
+# ---------------------------------------------------------------------------
+
+
+class RiskProfileSummary(BaseModel):
+    """Summary of the risk profile produced in the PLAN phase."""
+
+    hazard_summary: str
+    risk_assessment_confirmed: bool = False
+    workers_consulted: bool = False
+    key_risks: list[str] = Field(default_factory=list)
+    regulatory_drivers: list[str] = Field(
+        default_factory=list,
+        description="Primary legislation/regulations driving OH requirements (e.g. COSHH, Noise at Work).",
+    )
+
+
+# ---------------------------------------------------------------------------
+# PDCA — DO phase
+# ---------------------------------------------------------------------------
+
+
+class SurveillanceProvision(BaseModel):
+    """A single statutory OH surveillance provision (DO phase)."""
+
+    surveillance_type: SurveillanceType
+    description: str
+    frequency: str = Field(
+        ..., description="Surveillance frequency based on exposure and regulatory guidance."
+    )
+    competence_required: str = Field(
+        ..., description="Competence required to undertake and interpret this surveillance."
+    )
+    referral_pathway: str | None = Field(
+        default=None,
+        description="Referral and escalation pathway when abnormal findings occur.",
+    )
+    retention_period: str | None = Field(
+        default=None,
+        description="Statutory retention period for health records (e.g. COSHH: 40 years).",
+    )
+    regulatory_basis: str = Field(
+        ..., description="The regulation, ACoP, or guidance underpinning this provision."
+    )
+    delegation_notes: str | None = Field(
+        default=None,
+        description="Governance notes on safe delegation and supervision requirements.",
+    )
 
 
 class WorkflowStep(BaseModel):
@@ -64,8 +140,53 @@ class GovernancePrompt(BaseModel):
     regulatory_reference: str
 
 
+# ---------------------------------------------------------------------------
+# PDCA — CHECK phase
+# ---------------------------------------------------------------------------
+
+
+class AssuranceCheckItem(BaseModel):
+    """A single assurance/audit check item (CHECK phase)."""
+
+    area: str
+    question: str
+    status: ComplianceRating = ComplianceRating.NOT_ASSESSED
+    finding: str | None = None
+    recommendation: str | None = None
+    regulatory_reference: str | None = None
+
+
+class TrendInsight(BaseModel):
+    """An insight from anonymised surveillance data analysis (CHECK/Review)."""
+
+    area: str
+    observation: str
+    implication: str
+    recommended_action: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# PDCA — ACT phase
+# ---------------------------------------------------------------------------
+
+
+class ImprovementAction(BaseModel):
+    """A continuous-improvement action (ACT phase)."""
+
+    area: str
+    action: str
+    rationale: str
+    priority: str = Field(default="medium", description="high / medium / low")
+    regulatory_reference: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Workflow request / response
+# ---------------------------------------------------------------------------
+
+
 class WorkflowRequest(BaseModel):
-    """Input payload to generate a workflow."""
+    """Input payload to generate a PDCA-structured workflow."""
 
     organisation: OrganisationProfile
     hazards: list[HazardProfile] = Field(..., min_length=1)
@@ -73,14 +194,32 @@ class WorkflowRequest(BaseModel):
 
 
 class WorkflowResponse(BaseModel):
-    """Complete generated workflow with provenance metadata."""
+    """Complete PDCA-structured workflow with provenance metadata."""
 
     request_id: str
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     organisation_name: str
     hazard_summary: str
-    steps: list[WorkflowStep]
+
+    # PLAN
+    risk_profile: RiskProfileSummary | None = None
+
+    # DO — detailed surveillance provisions
+    surveillance_provisions: list[SurveillanceProvision] = Field(default_factory=list)
+    # DO — step-by-step workflow (retained for backwards compatibility)
+    steps: list[WorkflowStep] = Field(default_factory=list)
+
+    # CHECK
+    assurance_checks: list[AssuranceCheckItem] = Field(default_factory=list)
+    trend_insights: list[TrendInsight] = Field(default_factory=list)
+
+    # ACT
+    improvement_actions: list[ImprovementAction] = Field(default_factory=list)
+
+    # Governance
     governance_prompts: list[GovernancePrompt] = Field(default_factory=list)
+
+    # Provenance
     sources_cited: list[str] = Field(
         default_factory=list,
         description="Authoritative sources underpinning the workflow.",
@@ -91,15 +230,8 @@ class WorkflowResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Benchmarking & Gap Analysis
+# Benchmarking & Gap Analysis (PDCA CHECK)
 # ---------------------------------------------------------------------------
-
-
-class ComplianceRating(StrEnum):
-    COMPLIANT = "compliant"
-    PARTIALLY_COMPLIANT = "partially_compliant"
-    NON_COMPLIANT = "non_compliant"
-    NOT_ASSESSED = "not_assessed"
 
 
 class GapItem(BaseModel):
@@ -114,7 +246,7 @@ class GapItem(BaseModel):
 
 
 class GapAnalysis(BaseModel):
-    """Structured gap analysis output."""
+    """Structured gap analysis output (PDCA CHECK phase)."""
 
     request_id: str
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -125,7 +257,7 @@ class GapAnalysis(BaseModel):
 
 
 class BenchmarkResult(BaseModel):
-    """Benchmarking of current practice against regulatory minimums."""
+    """Benchmarking of current practice against regulatory minimums (PDCA CHECK)."""
 
     request_id: str
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
