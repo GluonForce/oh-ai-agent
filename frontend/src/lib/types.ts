@@ -125,6 +125,16 @@ export interface SurveillanceProvision {
   delegation_notes?: string;
 }
 
+export type PDCAPhase = "plan" | "do" | "check" | "act";
+
+export interface RiskAssessmentConfirmation {
+  risk_assessment_completed: boolean;
+  workers_consulted: boolean;
+  risk_assessment_date?: string;
+  assessor_name?: string;
+  additional_notes?: string;
+}
+
 export interface WorkflowStep {
   order: number;
   component: WorkflowComponent;
@@ -133,6 +143,7 @@ export interface WorkflowStep {
   frequency: string;
   regulatory_basis: string;
   delegation_notes?: string;
+  pdca_phase: PDCAPhase;
 }
 
 export interface GovernancePrompt {
@@ -171,6 +182,7 @@ export interface WorkflowRequest {
   organisation: OrganisationProfile;
   hazards: HazardProfile[];
   additional_context?: string;
+  risk_assessment: RiskAssessmentConfirmation;
 }
 
 export interface WorkflowResponse {
@@ -270,4 +282,55 @@ export interface InfoResponse {
   version: string;
   llm_model: string;
   disclaimers: string[];
+  framework?: string;
+}
+
+export interface ComplianceAuditRequest {
+  organisation: OrganisationProfile;
+  hazards: HazardProfile[];
+}
+
+export interface ComplianceAuditResponse {
+  request_id: string;
+  generated_at: string;
+  organisation_name: string;
+  audit_items: { area: string; question: string; status: string; finding?: string; recommendation?: string; regulatory_reference?: string }[];
+  overall_rating: ComplianceRating;
+  employee_coverage_assessed: boolean;
+  interval_adherence_assessed: boolean;
+  governance_assessed: boolean;
+  sources_cited: string[];
+  model_used: string;
+}
+
+export interface TrendAnalysisRequest {
+  organisation: OrganisationProfile;
+  hazards: HazardProfile[];
+  surveillance_summary: string;
+}
+
+export interface TrendAnalysisResponse {
+  request_id: string;
+  generated_at: string;
+  organisation_name: string;
+  findings: { area: string; observation: string; implication: string; recommended_action?: string }[];
+  control_effectiveness_indicators: string[];
+  sources_cited: string[];
+  model_used: string;
+}
+
+export interface ImprovementPlanRequest {
+  organisation: OrganisationProfile;
+  hazards: HazardProfile[];
+  surveillance_findings: string;
+}
+
+export interface ImprovementPlanResponse {
+  request_id: string;
+  generated_at: string;
+  organisation_name: string;
+  actions: { area: string; action: string; rationale: string; priority: string; regulatory_reference?: string }[];
+  management_review_items: string[];
+  sources_cited: string[];
+  model_used: string;
 }

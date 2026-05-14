@@ -30,6 +30,7 @@ import { api } from "@/lib/api";
 import type {
   HazardProfile,
   OrganisationProfile,
+  RiskAssessmentConfirmation,
   WorkflowResponse,
   ComplianceRating,
 } from "@/lib/types";
@@ -85,7 +86,8 @@ export default function WorkflowsPage() {
   const handleSubmit = async (
     org: OrganisationProfile,
     hazards: HazardProfile[],
-    additionalContext?: string
+    additionalContext?: string,
+    riskAssessment?: RiskAssessmentConfirmation
   ) => {
     setLoading(true);
     setError(null);
@@ -95,6 +97,10 @@ export default function WorkflowsPage() {
         organisation: org,
         hazards,
         additional_context: additionalContext,
+        risk_assessment: riskAssessment ?? {
+          risk_assessment_completed: false,
+          workers_consulted: false,
+        },
       });
       setResult(res);
       toast.success("PDCA workflow generated successfully");
@@ -125,6 +131,7 @@ export default function WorkflowsPage() {
         submitLabel="Generate PDCA Workflow"
         loading={loading}
         showAdditionalContext
+        showRiskAssessment
         onSubmit={handleSubmit}
       />
 
@@ -269,6 +276,7 @@ export default function WorkflowsPage() {
                         <TableRow>
                           <TableHead className="w-12">#</TableHead>
                           <TableHead>Component</TableHead>
+                          <TableHead>Phase</TableHead>
                           <TableHead className="hidden lg:table-cell">Description</TableHead>
                           <TableHead>Role</TableHead>
                           <TableHead>Frequency</TableHead>
@@ -283,6 +291,13 @@ export default function WorkflowsPage() {
                               <Badge variant="outline">
                                 {COMPONENT_LABELS[step.component] || step.component}
                               </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {step.pdca_phase && (
+                                <Badge variant="secondary" className="uppercase text-xs">
+                                  {step.pdca_phase}
+                                </Badge>
+                              )}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell text-sm">{step.description}</TableCell>
                             <TableCell className="text-sm">{step.responsible_role}</TableCell>

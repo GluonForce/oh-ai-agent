@@ -24,6 +24,7 @@ import type {
   HazardCategory,
   HazardProfile,
   OrganisationProfile,
+  RiskAssessmentConfirmation,
 } from "@/lib/types";
 
 const HAZARD_CATEGORIES: { value: HazardCategory; label: string }[] = [
@@ -88,10 +89,12 @@ interface OrgHazardFormProps {
   submitLabel: string;
   loading: boolean;
   showAdditionalContext?: boolean;
+  showRiskAssessment?: boolean;
   onSubmit: (
     org: OrganisationProfile,
     hazards: HazardProfile[],
-    additionalContext?: string
+    additionalContext?: string,
+    riskAssessment?: RiskAssessmentConfirmation
   ) => void;
 }
 
@@ -99,6 +102,7 @@ export function OrgHazardForm({
   submitLabel,
   loading,
   showAdditionalContext = false,
+  showRiskAssessment = false,
   onSubmit,
 }: OrgHazardFormProps) {
   const [org, setOrg] = useState<OrganisationProfile>({
@@ -117,6 +121,13 @@ export function OrgHazardForm({
   const [tasksText, setTasksText] = useState("");
   const [hazards, setHazards] = useState<HazardProfile[]>([emptyHazard()]);
   const [additionalContext, setAdditionalContext] = useState("");
+  const [riskAssessment, setRiskAssessment] = useState<RiskAssessmentConfirmation>({
+    risk_assessment_completed: false,
+    workers_consulted: false,
+    risk_assessment_date: "",
+    assessor_name: "",
+    additional_notes: "",
+  });
 
   const updateHazard = (idx: number, patch: Partial<HazardProfile>) => {
     setHazards((prev) =>
@@ -139,7 +150,12 @@ export function OrgHazardForm({
     };
     const cleanedHazards = hazards.filter((h) => h.hazard_phrase.trim());
     if (!finalOrg.name || !finalOrg.sector || cleanedHazards.length === 0) return;
-    onSubmit(finalOrg, cleanedHazards, additionalContext || undefined);
+    onSubmit(
+      finalOrg,
+      cleanedHazards,
+      additionalContext || undefined,
+      showRiskAssessment ? riskAssessment : undefined
+    );
   };
 
   return (
@@ -497,6 +513,66 @@ export function OrgHazardForm({
               placeholder="Any additional context for the workflow generation..."
               rows={3}
             />
+          </CardContent>
+        </Card>
+      )}
+
+      {showRiskAssessment && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Risk Assessment Confirmation</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="ra-completed"
+                checked={riskAssessment.risk_assessment_completed}
+                onCheckedChange={(v) =>
+                  setRiskAssessment({ ...riskAssessment, risk_assessment_completed: v === true })
+                }
+                required
+              />
+              <Label htmlFor="ra-completed" className="text-sm font-normal">
+                Risk assessment has been completed
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="ra-workers"
+                checked={riskAssessment.workers_consulted}
+                onCheckedChange={(v) =>
+                  setRiskAssessment({ ...riskAssessment, workers_consulted: v === true })
+                }
+                required
+              />
+              <Label htmlFor="ra-workers" className="text-sm font-normal">
+                Workers have been consulted
+              </Label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ra-date">Risk Assessment Date</Label>
+                <Input
+                  id="ra-date"
+                  type="date"
+                  value={riskAssessment.risk_assessment_date ?? ""}
+                  onChange={(e) =>
+                    setRiskAssessment({ ...riskAssessment, risk_assessment_date: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ra-assessor">Assessor Name</Label>
+                <Input
+                  id="ra-assessor"
+                  value={riskAssessment.assessor_name ?? ""}
+                  onChange={(e) =>
+                    setRiskAssessment({ ...riskAssessment, assessor_name: e.target.value })
+                  }
+                  placeholder="e.g. Dr. Jane Smith"
+                />
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
