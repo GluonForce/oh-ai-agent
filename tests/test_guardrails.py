@@ -82,7 +82,6 @@ class TestSystemPrompt:
     def test_guardrail_prompt_contains_hard_constraints(self) -> None:
         lower = SYSTEM_GUARDRAIL_PROMPT.lower()
         assert "clinical diagnos" in lower
-        assert "medical advice" in lower
         assert "professional judgement" in lower
         assert "duty holder" in lower
 

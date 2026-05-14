@@ -21,10 +21,16 @@ from oh_agent.models.audit import AuditEntry, AuditEventType
 from oh_agent.models.hazard import HazardProfile
 from oh_agent.models.organisation import OrganisationProfile
 from oh_agent.models.workflow import (
+    AssuranceCheckItem,
     BenchmarkResult,
+    ComplianceAuditResponse,
     ComplianceRating,
     GapAnalysis,
     GapItem,
+    ImprovementAction,
+    ImprovementPlanResponse,
+    TrendAnalysisResponse,
+    TrendInsight,
 )
 
 logger = logging.getLogger(__name__)
@@ -285,6 +291,424 @@ class BenchmarkAgent:
                 event_type=AuditEventType.GAP_ANALYSIS_GENERATED,
                 request_id=request_id,
                 detail={"gaps_found": len(gaps), "overall_rating": overall},
+                sources_used=result.sources_cited,
+                model_used=self._settings.llm_model,
+            )
+        )
+        return result, audit
+
+
+# ---------------------------------------------------------------------------
+# CHECK — Compliance Audit Agent
+# ---------------------------------------------------------------------------
+
+_COMPLIANCE_AUDIT_PROMPT = """\
+Conduct a structured compliance audit of the following organisation's \
+occupational health arrangements against UK statutory requirements, \
+using a PDCA framework.
+
+## Organisation
+- Name: {org_name}
+- Sector: {sector}
+- Delivery model: {delivery_model}
+- Existing surveillance: {existing_surveillance}
+- Risk assessment confirmed: {risk_assessment_confirmed}
+- Workers consulted: {workers_consulted}
+
+## Hazards
+{hazards_block}
+
+## Retrieved knowledge
+{knowledge_context}
+
+## Instructions
+Assess compliance across these areas:
+1. Employee coverage — are all exposed employees identified and included?
+2. Interval adherence — are surveillance intervals meeting regulatory minimums?
+3. Governance — is there adequate oversight, delegation, and competence assurance?
+
+For each audit item, provide:
+- area: the compliance area
+- question: the audit question
+- status: one of "compliant", "partially_compliant", "non_compliant", "not_assessed"
+- finding: what was found
+- recommendation: actionable improvement step
+- regulatory_reference: specific regulation or guidance
+
+Also provide an overall_rating and boolean flags for each assessment area.
+
+Respond ONLY with valid JSON:
+{{
+  "audit_items": [{{
+    "area": "...",
+    "question": "...",
+    "status": "...",
+    "finding": "...",
+    "recommendation": "...",
+    "regulatory_reference": "..."
+  }}],
+  "overall_rating": "compliant|partially_compliant|non_compliant|not_assessed",
+  "employee_coverage_assessed": true,
+  "interval_adherence_assessed": true,
+  "governance_assessed": true,
+  "sources_cited": ["..."]
+}}"""
+
+
+class ComplianceAuditAgent:
+    """Evaluates statutory OH compliance (CHECK phase)."""
+
+    def __init__(
+        self,
+        settings: Settings,
+        retriever: KnowledgeRetriever | None = None,
+        client: OpenAI | None = None,
+    ) -> None:
+        self._settings = settings
+        self._retriever = retriever
+        if client is not None:
+            self._client = client
+        else:
+            from oh_agent.agents.llm_client import create_llm_client
+
+            self._client = create_llm_client(settings)
+
+    def _retrieve(self, query: str) -> list[RetrievedChunk]:
+        if self._retriever and self._retriever.collection_count > 0:
+            return self._retriever.query(query)
+        return []
+
+    def audit(
+        self,
+        organisation: OrganisationProfile,
+        hazards: list[HazardProfile],
+    ) -> tuple[ComplianceAuditResponse, list[AuditEntry]]:
+        request_id = str(uuid7())
+        audit: list[AuditEntry] = []
+
+        audit.append(
+            AuditEntry(
+                event_type=AuditEventType.COMPLIANCE_AUDIT_REQUESTED,
+                request_id=request_id,
+                detail={"organisation": organisation.name},
+            )
+        )
+
+        chunks = self._retrieve(f"{organisation.sector} compliance audit statutory requirements")
+
+        prompt = _COMPLIANCE_AUDIT_PROMPT.format(
+            org_name=organisation.name,
+            sector=organisation.sector,
+            delivery_model=organisation.delivery_model.value,
+            existing_surveillance=organisation.existing_surveillance or "None described",
+            risk_assessment_confirmed=organisation.risk_assessment_confirmed,
+            workers_consulted=organisation.workers_consulted,
+            hazards_block=_format_hazards(hazards),
+            knowledge_context=_format_knowledge(chunks),
+        )
+
+        completion = self._client.chat.completions.create(
+            model=self._settings.llm_model,
+            temperature=self._settings.llm_temperature,
+            max_tokens=self._settings.llm_max_tokens,
+            messages=[
+                {"role": "system", "content": SYSTEM_GUARDRAIL_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        raw = completion.choices[0].message.content or ""
+        check_output(raw)
+
+        parsed = _parse_json(raw)
+        audit_items = [AssuranceCheckItem(**item) for item in parsed.get("audit_items", [])]
+        overall = parsed.get("overall_rating", "not_assessed")
+
+        result = ComplianceAuditResponse(
+            request_id=request_id,
+            organisation_name=organisation.name,
+            audit_items=audit_items,
+            overall_rating=ComplianceRating(overall),
+            employee_coverage_assessed=parsed.get("employee_coverage_assessed", False),
+            interval_adherence_assessed=parsed.get("interval_adherence_assessed", False),
+            governance_assessed=parsed.get("governance_assessed", False),
+            sources_cited=parsed.get("sources_cited", []),
+            model_used=self._settings.llm_model,
+        )
+
+        audit.append(
+            AuditEntry(
+                event_type=AuditEventType.COMPLIANCE_AUDIT_GENERATED,
+                request_id=request_id,
+                detail={"audit_items_count": len(audit_items), "overall_rating": overall},
+                sources_used=result.sources_cited,
+                model_used=self._settings.llm_model,
+            )
+        )
+        return result, audit
+
+
+# ---------------------------------------------------------------------------
+# REVIEW — Trend Analysis Agent
+# ---------------------------------------------------------------------------
+
+_TREND_ANALYSIS_PROMPT = """\
+Analyse the following anonymised surveillance data for an organisation's \
+occupational health programme. Identify trends, patterns, and implications \
+using a PDCA framework.
+
+## Organisation
+- Name: {org_name}
+- Sector: {sector}
+- Delivery model: {delivery_model}
+- Existing surveillance: {existing_surveillance}
+
+## Hazards
+{hazards_block}
+
+## Surveillance data summary
+{surveillance_summary}
+
+## Retrieved knowledge
+{knowledge_context}
+
+## Instructions
+For each finding, provide:
+- area: the surveillance/health area
+- observation: what the data shows
+- implication: clinical or regulatory significance
+- recommended_action: suggested follow-up
+
+Also provide control effectiveness indicators.
+
+Respond ONLY with valid JSON:
+{{
+  "findings": [{{
+    "area": "...",
+    "observation": "...",
+    "implication": "...",
+    "recommended_action": "..."
+  }}],
+  "control_effectiveness_indicators": ["..."],
+  "sources_cited": ["..."]
+}}"""
+
+
+class TrendAnalysisAgent:
+    """Analyses anonymised surveillance data for trends (REVIEW phase)."""
+
+    def __init__(
+        self,
+        settings: Settings,
+        retriever: KnowledgeRetriever | None = None,
+        client: OpenAI | None = None,
+    ) -> None:
+        self._settings = settings
+        self._retriever = retriever
+        if client is not None:
+            self._client = client
+        else:
+            from oh_agent.agents.llm_client import create_llm_client
+
+            self._client = create_llm_client(settings)
+
+    def _retrieve(self, query: str) -> list[RetrievedChunk]:
+        if self._retriever and self._retriever.collection_count > 0:
+            return self._retriever.query(query)
+        return []
+
+    def analyse(
+        self,
+        organisation: OrganisationProfile,
+        hazards: list[HazardProfile],
+        surveillance_summary: str,
+    ) -> tuple[TrendAnalysisResponse, list[AuditEntry]]:
+        request_id = str(uuid7())
+        audit: list[AuditEntry] = []
+
+        audit.append(
+            AuditEntry(
+                event_type=AuditEventType.TREND_ANALYSIS_REQUESTED,
+                request_id=request_id,
+                detail={"organisation": organisation.name},
+            )
+        )
+
+        chunks = self._retrieve(f"{organisation.sector} surveillance trend analysis")
+
+        prompt = _TREND_ANALYSIS_PROMPT.format(
+            org_name=organisation.name,
+            sector=organisation.sector,
+            delivery_model=organisation.delivery_model.value,
+            existing_surveillance=organisation.existing_surveillance or "None described",
+            hazards_block=_format_hazards(hazards),
+            surveillance_summary=surveillance_summary,
+            knowledge_context=_format_knowledge(chunks),
+        )
+
+        completion = self._client.chat.completions.create(
+            model=self._settings.llm_model,
+            temperature=self._settings.llm_temperature,
+            max_tokens=self._settings.llm_max_tokens,
+            messages=[
+                {"role": "system", "content": SYSTEM_GUARDRAIL_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        raw = completion.choices[0].message.content or ""
+        check_output(raw)
+
+        parsed = _parse_json(raw)
+        findings = [TrendInsight(**f) for f in parsed.get("findings", [])]
+
+        result = TrendAnalysisResponse(
+            request_id=request_id,
+            organisation_name=organisation.name,
+            findings=findings,
+            control_effectiveness_indicators=parsed.get("control_effectiveness_indicators", []),
+            sources_cited=parsed.get("sources_cited", []),
+            model_used=self._settings.llm_model,
+        )
+
+        audit.append(
+            AuditEntry(
+                event_type=AuditEventType.TREND_ANALYSIS_GENERATED,
+                request_id=request_id,
+                detail={"findings_count": len(findings)},
+                sources_used=result.sources_cited,
+                model_used=self._settings.llm_model,
+            )
+        )
+        return result, audit
+
+
+# ---------------------------------------------------------------------------
+# ACT — Improvement Plan Agent
+# ---------------------------------------------------------------------------
+
+_IMPROVEMENT_PLAN_PROMPT = """\
+Generate improvement actions based on the following surveillance findings \
+for an organisation's occupational health programme, using a PDCA framework.
+
+## Organisation
+- Name: {org_name}
+- Sector: {sector}
+- Delivery model: {delivery_model}
+- Existing surveillance: {existing_surveillance}
+
+## Hazards
+{hazards_block}
+
+## Surveillance findings
+{surveillance_findings}
+
+## Retrieved knowledge
+{knowledge_context}
+
+## Instructions
+For each improvement action, provide:
+- area: the area requiring improvement
+- action: specific actionable step
+- rationale: evidence-based justification
+- priority: high / medium / low
+- regulatory_reference: relevant regulation or guidance
+
+Also provide management review items.
+
+Respond ONLY with valid JSON:
+{{
+  "actions": [{{
+    "area": "...",
+    "action": "...",
+    "rationale": "...",
+    "priority": "high|medium|low",
+    "regulatory_reference": "..."
+  }}],
+  "management_review_items": ["..."],
+  "sources_cited": ["..."]
+}}"""
+
+
+class ImprovementPlanAgent:
+    """Generates improvement actions from surveillance findings (ACT phase)."""
+
+    def __init__(
+        self,
+        settings: Settings,
+        retriever: KnowledgeRetriever | None = None,
+        client: OpenAI | None = None,
+    ) -> None:
+        self._settings = settings
+        self._retriever = retriever
+        if client is not None:
+            self._client = client
+        else:
+            from oh_agent.agents.llm_client import create_llm_client
+
+            self._client = create_llm_client(settings)
+
+    def _retrieve(self, query: str) -> list[RetrievedChunk]:
+        if self._retriever and self._retriever.collection_count > 0:
+            return self._retriever.query(query)
+        return []
+
+    def plan(
+        self,
+        organisation: OrganisationProfile,
+        hazards: list[HazardProfile],
+        surveillance_findings: str,
+    ) -> tuple[ImprovementPlanResponse, list[AuditEntry]]:
+        request_id = str(uuid7())
+        audit: list[AuditEntry] = []
+
+        audit.append(
+            AuditEntry(
+                event_type=AuditEventType.IMPROVEMENT_PLAN_REQUESTED,
+                request_id=request_id,
+                detail={"organisation": organisation.name},
+            )
+        )
+
+        chunks = self._retrieve(f"{organisation.sector} improvement plan continuous improvement")
+
+        prompt = _IMPROVEMENT_PLAN_PROMPT.format(
+            org_name=organisation.name,
+            sector=organisation.sector,
+            delivery_model=organisation.delivery_model.value,
+            existing_surveillance=organisation.existing_surveillance or "None described",
+            hazards_block=_format_hazards(hazards),
+            surveillance_findings=surveillance_findings,
+            knowledge_context=_format_knowledge(chunks),
+        )
+
+        completion = self._client.chat.completions.create(
+            model=self._settings.llm_model,
+            temperature=self._settings.llm_temperature,
+            max_tokens=self._settings.llm_max_tokens,
+            messages=[
+                {"role": "system", "content": SYSTEM_GUARDRAIL_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        raw = completion.choices[0].message.content or ""
+        check_output(raw)
+
+        parsed = _parse_json(raw)
+        actions = [ImprovementAction(**a) for a in parsed.get("actions", [])]
+
+        result = ImprovementPlanResponse(
+            request_id=request_id,
+            organisation_name=organisation.name,
+            actions=actions,
+            management_review_items=parsed.get("management_review_items", []),
+            sources_cited=parsed.get("sources_cited", []),
+            model_used=self._settings.llm_model,
+        )
+
+        audit.append(
+            AuditEntry(
+                event_type=AuditEventType.IMPROVEMENT_PLAN_GENERATED,
+                request_id=request_id,
+                detail={"actions_count": len(actions)},
                 sources_used=result.sources_cited,
                 model_used=self._settings.llm_model,
             )

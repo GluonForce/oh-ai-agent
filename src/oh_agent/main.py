@@ -21,7 +21,12 @@ from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from oh_agent.agents.benchmark_agent import BenchmarkAgent
+from oh_agent.agents.benchmark_agent import (
+    BenchmarkAgent,
+    ComplianceAuditAgent,
+    ImprovementPlanAgent,
+    TrendAnalysisAgent,
+)
 from oh_agent.agents.guardrails import MANDATORY_DISCLAIMERS
 from oh_agent.agents.workflow_agent import WorkflowAgent
 from oh_agent.config import Settings, get_settings
@@ -34,7 +39,13 @@ from oh_agent.models.hazard import HazardProfile
 from oh_agent.models.organisation import OrganisationProfile
 from oh_agent.models.workflow import (
     BenchmarkResult,
+    ComplianceAuditRequest,
+    ComplianceAuditResponse,
     GapAnalysis,
+    ImprovementPlanRequest,
+    ImprovementPlanResponse,
+    TrendAnalysisRequest,
+    TrendAnalysisResponse,
     WorkflowRequest,
     WorkflowResponse,
 )
@@ -91,9 +102,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="OH AI Agent",
-    version="0.1.0",
+    version="0.2.0",
     description=(
-        "Evidence-based, regulation-aligned occupational health workflow harness. "
+        "Evidence-based, regulation-aligned occupational health workflow harness "
+        "structured around the Plan-Do-Check-Act (PDCA) framework. "
         "Designed for highly regulated UK healthcare environments."
     ),
     lifespan=lifespan,
@@ -139,6 +151,7 @@ async def info() -> dict[str, Any]:
     return {
         "name": settings.api_title,
         "version": settings.api_version,
+        "framework": "PDCA (Plan-Do-Check-Act)",
         "llm_model": settings.llm_model,
         "disclaimers": MANDATORY_DISCLAIMERS,
     }
@@ -147,6 +160,15 @@ async def info() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Workflow endpoints
 # ---------------------------------------------------------------------------
+
+
+def _handle_llm_error(exc: Exception) -> None:
+    msg = str(exc)
+    if "insufficient_quota" in msg or "exceeded" in msg.lower():
+        raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc
+    if "risk assessment must be confirmed" in msg.lower() or "worker consultation" in msg.lower():
+        raise HTTPException(422, str(exc)) from exc
+    raise HTTPException(502, f"LLM request failed: {msg}") from exc
 
 
 @app.post("/api/v1/workflows", response_model=WorkflowResponse, tags=["workflows"])
@@ -160,12 +182,7 @@ async def generate_workflow(request: WorkflowRequest) -> WorkflowResponse:
     try:
         response, audit_entries = agent.generate(request)
     except Exception as exc:
-        msg = str(exc)
-        if "insufficient_quota" in msg or "exceeded" in msg.lower():
-            raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc
-        if "api key" in msg.lower() or "auth" in msg.lower():
-            raise HTTPException(401, f"LLM authentication failed: {msg}") from exc
-        raise HTTPException(502, f"LLM request failed: {msg}") from exc
+        _handle_llm_error(exc)
     audit_svc.log_many(audit_entries)
     return response
 
@@ -191,10 +208,7 @@ async def benchmark(request: BenchmarkRequest) -> BenchmarkResult:
     try:
         result, audit_entries = agent.benchmark(request.organisation, request.hazards)
     except Exception as exc:
-        msg = str(exc)
-        if "insufficient_quota" in msg or "exceeded" in msg.lower():
-            raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc
-        raise HTTPException(502, f"LLM request failed: {msg}") from exc
+        _handle_llm_error(exc)
     audit_svc.log_many(audit_entries)
     return result
 
@@ -210,10 +224,67 @@ async def gap_analysis(request: BenchmarkRequest) -> GapAnalysis:
     try:
         result, audit_entries = agent.gap_analysis(request.organisation, request.hazards)
     except Exception as exc:
-        msg = str(exc)
-        if "insufficient_quota" in msg or "exceeded" in msg.lower():
-            raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc
-        raise HTTPException(502, f"LLM request failed: {msg}") from exc
+        _handle_llm_error(exc)
+    audit_svc.log_many(audit_entries)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# CHECK — Compliance Audit
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/v1/compliance-audit", response_model=ComplianceAuditResponse, tags=["check"])
+async def compliance_audit(request: ComplianceAuditRequest) -> ComplianceAuditResponse:
+    """Evaluate statutory OH compliance (CHECK phase)."""
+    settings = _get_settings()
+    retriever = _get_retriever()
+    audit_svc = _get_audit()
+    agent = ComplianceAuditAgent(settings=settings, retriever=retriever)
+    try:
+        result, audit_entries = agent.audit(request.organisation, request.hazards)
+    except Exception as exc:
+        _handle_llm_error(exc)
+    audit_svc.log_many(audit_entries)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# REVIEW — Trend Analysis
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/v1/trend-analysis", response_model=TrendAnalysisResponse, tags=["review"])
+async def trend_analysis(request: TrendAnalysisRequest) -> TrendAnalysisResponse:
+    """Analyse anonymised surveillance data for trends (REVIEW phase)."""
+    settings = _get_settings()
+    retriever = _get_retriever()
+    audit_svc = _get_audit()
+    agent = TrendAnalysisAgent(settings=settings, retriever=retriever)
+    try:
+        result, audit_entries = agent.analyse(request.organisation, request.hazards, request.surveillance_summary)
+    except Exception as exc:
+        _handle_llm_error(exc)
+    audit_svc.log_many(audit_entries)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# ACT — Improvement Plan
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/v1/improvement-plan", response_model=ImprovementPlanResponse, tags=["act"])
+async def improvement_plan(request: ImprovementPlanRequest) -> ImprovementPlanResponse:
+    """Generate improvement actions from surveillance findings (ACT phase)."""
+    settings = _get_settings()
+    retriever = _get_retriever()
+    audit_svc = _get_audit()
+    agent = ImprovementPlanAgent(settings=settings, retriever=retriever)
+    try:
+        result, audit_entries = agent.plan(request.organisation, request.hazards, request.surveillance_findings)
+    except Exception as exc:
+        _handle_llm_error(exc)
     audit_svc.log_many(audit_entries)
     return result
 
