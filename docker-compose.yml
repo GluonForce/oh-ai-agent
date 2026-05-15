@@ -1,0 +1,56 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oh-agent-backend
+    ports:
+      - "${OH_API_PORT:-8000}:8000"
+    environment:
+      - OH_ENVIRONMENT=${OH_ENVIRONMENT:-development}
+      - OH_DEBUG=${OH_DEBUG:-false}
+      - OH_LOG_LEVEL=${OH_LOG_LEVEL:-INFO}
+      - OH_LLM_API_KEY=${OH_LLM_API_KEY:-}
+      - OH_OPENAI_API_KEY=${OH_OPENAI_API_KEY:-}
+      - OH_LLM_BASE_URL=${OH_LLM_BASE_URL:-}
+      - OH_LLM_MODEL=${OH_LLM_MODEL:-gpt-4o}
+      - OH_LLM_TEMPERATURE=${OH_LLM_TEMPERATURE:-0.1}
+      - OH_LLM_MAX_TOKENS=${OH_LLM_MAX_TOKENS:-4096}
+      - OH_KNOWLEDGE_DIR=/app/knowledge_base
+      - OH_CHROMA_PERSIST_DIR=/app/data/chroma
+      - OH_AUDIT_LOG_FILE=/app/data/logs/audit.jsonl
+    volumes:
+      - chroma_data:/app/data/chroma
+      - audit_logs:/app/data/logs
+      - ./knowledge_base:/app/knowledge_base:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    container_name: oh-agent-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  chroma_data:
+  audit_logs:

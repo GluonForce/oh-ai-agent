@@ -88,6 +88,34 @@ uvicorn oh_agent.main:app --reload --host 0.0.0.0 --port 8000
 cd frontend && npm run dev
 ```
 
+### Docker Compose (recommended for production)
+
+Run both services with a single command:
+
+```bash
+# Copy env and set your API key
+cp .env.example .env
+# Edit .env with your LLM provider config
+
+# Build and start
+docker compose up --build
+
+# Or run in background
+docker compose up --build -d
+```
+
+- Backend: `http://localhost:8000` (API + Swagger UI at `/docs`)
+- Frontend: `http://localhost:3000`
+
+Data is persisted in Docker volumes (`chroma_data` for the knowledge store, `audit_logs` for audit trail). The `knowledge_base/` directory is mounted read-only so you can add documents without rebuilding.
+
+To stop:
+
+```bash
+docker compose down        # stop containers
+docker compose down -v     # stop and remove data volumes
+```
+
 ### LLM Provider Configuration
 
 The agent works with **any OpenAI-compatible API**. Set these environment variables in `.env`:
