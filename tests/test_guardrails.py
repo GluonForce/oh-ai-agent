@@ -7,6 +7,7 @@ from oh_agent.agents.guardrails import (
     SYSTEM_GUARDRAIL_PROMPT,
     append_disclaimers,
     check_output,
+    check_parsed_content,
 )
 
 
@@ -44,14 +45,34 @@ class TestCheckOutput:
         result = check_output("This is a clinical decision that requires immediate action.")
         assert result.passed is False
 
-    def test_safe_use_of_similar_words(self) -> None:
+    def test_diagnostic_spirometry_allowed(self) -> None:
         result = check_output(
             "The workflow components include a diagnostic spirometry step "
             "to be performed by a qualified OHN as part of surveillance."
         )
-        # "diagnostic" as an adjective for a test type should trigger the pattern
-        # but this is expected — the guardrail is conservative
-        assert isinstance(result.passed, bool)
+        assert result.passed is True
+
+    def test_referral_when_diagnosed_allowed(self) -> None:
+        result = check_output(
+            "Refer to the occupational health physician if dermatitis is diagnosed "
+            "following skin surveillance."
+        )
+        assert result.passed is True
+
+    def test_disclaimer_with_diagnosis_allowed(self) -> None:
+        result = check_parsed_content(
+            {
+                "steps": [
+                    {
+                        "description": (
+                            "This does not constitute clinical advice or diagnosis; "
+                            "refer for clinical assessment if indicated."
+                        )
+                    }
+                ]
+            }
+        )
+        assert result.passed is True
 
     def test_multiple_violations(self) -> None:
         result = check_output("I diagnose asthma. I prescribe an inhaler. As your doctor, take this.")

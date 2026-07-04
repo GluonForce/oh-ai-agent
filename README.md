@@ -29,9 +29,11 @@ An open-access AI Agent that supports occupational health (OH) practitioners in 
 
 ## Quick Start (Local Setup)
 
+**New to Python or on Windows?** See the step-by-step guide for running from a zip file: [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md).
+
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.11+ and [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - Node.js 18+ and npm
 - An API key for any OpenAI-compatible LLM provider
 
@@ -45,8 +47,8 @@ cd oh-ai-agent
 ### 2. Backend Setup
 
 ```bash
-# Install Python dependencies (development mode)
-pip install -e ".[dev]"
+# Install Python dependencies (creates .venv, includes dev tools)
+uv sync
 
 # Copy environment config
 cp .env.example .env
@@ -64,7 +66,7 @@ cd ..
 ### 4. Start the Backend
 
 ```bash
-uvicorn oh_agent.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn oh_agent.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The API will be available at `http://localhost:8000`. Interactive API docs (Swagger UI) at `http://localhost:8000/docs`.
@@ -82,7 +84,7 @@ The UI will be available at `http://localhost:3000`.
 
 ```bash
 # Terminal 1 — Backend
-uvicorn oh_agent.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn oh_agent.main:app --reload --host 0.0.0.0 --port 8000
 
 # Terminal 2 — Frontend
 cd frontend && npm run dev
@@ -90,47 +92,59 @@ cd frontend && npm run dev
 
 ### LLM Provider Configuration
 
-The agent works with **any OpenAI-compatible API**. Set these environment variables in `.env`:
+Chat completions use **[LiteLLM](https://docs.litellm.ai/)** by default so you can switch models via environment variables only. Set these in `.env`:
 
 | Variable | Description |
 |---|---|
-| `OH_LLM_API_KEY` | Your API key (takes precedence over `OH_OPENAI_API_KEY`) |
-| `OH_LLM_BASE_URL` | Custom endpoint URL (leave empty for OpenAI) |
-| `OH_LLM_MODEL` | Model identifier matching your provider |
+| `OH_LLM_PROVIDER` | `litellm` (default), `openrouter`, or `openai` (legacy OpenAI SDK only) |
+| `OH_LLM_API_KEY` | API key (takes precedence over `OH_OPENAI_API_KEY`) |
+| `OH_LLM_MODEL` | Model id for your provider |
+| `OH_LLM_BASE_URL` | Optional API base (OpenRouter preset fills this automatically) |
 
-**Provider examples:**
+`GET /info` returns `llm_provider`, `llm_model`, and `llm_resolved_model` (the id actually sent to the API).
+
+**Examples:**
 
 ```bash
-# OpenAI (default)
+# OpenAI
+OH_LLM_PROVIDER=litellm
 OH_LLM_API_KEY=sk-...
 OH_LLM_MODEL=gpt-4o
 
-# OpenRouter (access to many models)
-OH_LLM_API_KEY=sk-or-...
-OH_LLM_BASE_URL=https://openrouter.ai/api/v1
+# OpenRouter (recommended preset — prefixes model with openrouter/)
+OH_LLM_PROVIDER=openrouter
+OH_LLM_API_KEY=sk-or-v1-...
 OH_LLM_MODEL=anthropic/claude-sonnet-4
 
-# Anthropic direct
-OH_LLM_API_KEY=sk-ant-...
-OH_LLM_BASE_URL=https://api.anthropic.com/v1
-OH_LLM_MODEL=claude-sonnet-4-20250514
-
-# Groq (fast inference)
+# Groq
+OH_LLM_PROVIDER=litellm
 OH_LLM_API_KEY=gsk_...
-OH_LLM_BASE_URL=https://api.groq.com/openai/v1
-OH_LLM_MODEL=llama-3.3-70b-versatile
+OH_LLM_MODEL=groq/llama-3.3-70b-versatile
 
 # Local Ollama
+OH_LLM_PROVIDER=litellm
 OH_LLM_BASE_URL=http://localhost:11434/v1
-OH_LLM_MODEL=llama3
+OH_LLM_MODEL=ollama/llama3
 OH_LLM_API_KEY=ollama
+```
+
+### Python tooling (uv)
+
+This project uses [uv](https://docs.astral.sh/uv/) for dependencies. Commit `uv.lock` with application changes.
+
+```bash
+uv sync              # install / update .venv (includes dev tools)
+uv add <package>     # add a runtime dependency
+uv add --dev <pkg>   # add a dev dependency
+uv lock              # refresh lockfile after editing pyproject.toml
+uv run <command>     # run a command inside the project venv
 ```
 
 ### Run Tests
 
 ```bash
 # Backend tests
-pytest
+uv run pytest
 
 # Frontend lint
 cd frontend && npm run lint
@@ -140,9 +154,9 @@ cd frontend && npm run lint
 
 ```bash
 # Backend
-ruff check src/ tests/
-ruff format --check src/ tests/
-mypy src/
+uv run ruff check src/ tests/
+uv run ruff format --check src/ tests/
+uv run mypy src/
 
 # Frontend
 cd frontend && npm run lint && npm run build
@@ -240,6 +254,17 @@ This agent is designed for deployment in regulated UK healthcare environments. A
 - **Mandatory disclaimers** clarifying scope boundaries
 - **Governance prompts** for safe delegation and supervision
 - **Full audit trail** of every action for regulatory inspection
+
+---
+
+## Deployment (Vercel + Railway)
+
+To share a URL with end users, deploy the **backend on Railway** and the **frontend on Vercel**:
+
+- **Backend:** root `Dockerfile` + persistent volume at `/app/data`
+- **Frontend:** `frontend/` with `NEXT_PUBLIC_API_URL` pointing at your Railway URL
+
+Full step-by-step instructions: **[docs/DEPLOY_VERCEL_RAILWAY.md](docs/DEPLOY_VERCEL_RAILWAY.md)**
 
 ---
 

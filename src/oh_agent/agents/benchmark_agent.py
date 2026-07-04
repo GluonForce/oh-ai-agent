@@ -11,10 +11,15 @@ import json
 import logging
 from typing import Any
 
-from openai import OpenAI
 from uuid_extensions import uuid7
 
-from oh_agent.agents.guardrails import SYSTEM_GUARDRAIL_PROMPT, check_output
+from oh_agent.agents.llm_client import LLMClient, create_llm_client
+
+from oh_agent.agents.guardrails import (
+    GuardrailViolation,
+    SYSTEM_GUARDRAIL_PROMPT,
+    check_parsed_content,
+)
 from oh_agent.config import Settings
 from oh_agent.knowledge.retriever import KnowledgeRetriever, RetrievedChunk
 from oh_agent.models.audit import AuditEntry, AuditEventType
@@ -154,16 +159,11 @@ class BenchmarkAgent:
         self,
         settings: Settings,
         retriever: KnowledgeRetriever | None = None,
-        client: OpenAI | None = None,
+        client: LLMClient | None = None,
     ) -> None:
         self._settings = settings
         self._retriever = retriever
-        if client is not None:
-            self._client = client
-        else:
-            from oh_agent.agents.llm_client import create_llm_client
-
-            self._client = create_llm_client(settings)
+        self._client = client if client is not None else create_llm_client(settings)
 
     def _retrieve(self, query: str) -> list[RetrievedChunk]:
         if self._retriever and self._retriever.collection_count > 0:
@@ -199,19 +199,16 @@ class BenchmarkAgent:
             knowledge_context=_format_knowledge(chunks),
         )
 
-        completion = self._client.chat.completions.create(
-            model=self._settings.llm_model,
-            temperature=self._settings.llm_temperature,
-            max_tokens=self._settings.llm_max_tokens,
-            messages=[
+        raw = self._client.complete(
+            [
                 {"role": "system", "content": SYSTEM_GUARDRAIL_PROMPT},
                 {"role": "user", "content": prompt},
             ],
         )
-        raw = completion.choices[0].message.content or ""
-        check_output(raw)
-
         parsed = _parse_json(raw)
+        guardrail_result = check_parsed_content(parsed)
+        if not guardrail_result.passed:
+            raise GuardrailViolation(guardrail_result.violations)
         result = BenchmarkResult(
             request_id=request_id,
             organisation_name=organisation.name,
@@ -262,19 +259,16 @@ class BenchmarkAgent:
             knowledge_context=_format_knowledge(chunks),
         )
 
-        completion = self._client.chat.completions.create(
-            model=self._settings.llm_model,
-            temperature=self._settings.llm_temperature,
-            max_tokens=self._settings.llm_max_tokens,
-            messages=[
+        raw = self._client.complete(
+            [
                 {"role": "system", "content": SYSTEM_GUARDRAIL_PROMPT},
                 {"role": "user", "content": prompt},
             ],
         )
-        raw = completion.choices[0].message.content or ""
-        check_output(raw)
-
         parsed = _parse_json(raw)
+        guardrail_result = check_parsed_content(parsed)
+        if not guardrail_result.passed:
+            raise GuardrailViolation(guardrail_result.violations)
         gaps = [GapItem(**g) for g in parsed.get("gaps", [])]
         overall = parsed.get("overall_rating", "not_assessed")
 
@@ -362,16 +356,11 @@ class ComplianceAuditAgent:
         self,
         settings: Settings,
         retriever: KnowledgeRetriever | None = None,
-        client: OpenAI | None = None,
+        client: LLMClient | None = None,
     ) -> None:
         self._settings = settings
         self._retriever = retriever
-        if client is not None:
-            self._client = client
-        else:
-            from oh_agent.agents.llm_client import create_llm_client
-
-            self._client = create_llm_client(settings)
+        self._client = client if client is not None else create_llm_client(settings)
 
     def _retrieve(self, query: str) -> list[RetrievedChunk]:
         if self._retriever and self._retriever.collection_count > 0:
@@ -407,19 +396,16 @@ class ComplianceAuditAgent:
             knowledge_context=_format_knowledge(chunks),
         )
 
-        completion = self._client.chat.completions.create(
-            model=self._settings.llm_model,
-            temperature=self._settings.llm_temperature,
-            max_tokens=self._settings.llm_max_tokens,
-            messages=[
+        raw = self._client.complete(
+            [
                 {"role": "system", "content": SYSTEM_GUARDRAIL_PROMPT},
                 {"role": "user", "content": prompt},
             ],
         )
-        raw = completion.choices[0].message.content or ""
-        check_output(raw)
-
         parsed = _parse_json(raw)
+        guardrail_result = check_parsed_content(parsed)
+        if not guardrail_result.passed:
+            raise GuardrailViolation(guardrail_result.violations)
         audit_items = [AssuranceCheckItem(**item) for item in parsed.get("audit_items", [])]
         overall = parsed.get("overall_rating", "not_assessed")
 
@@ -500,16 +486,11 @@ class TrendAnalysisAgent:
         self,
         settings: Settings,
         retriever: KnowledgeRetriever | None = None,
-        client: OpenAI | None = None,
+        client: LLMClient | None = None,
     ) -> None:
         self._settings = settings
         self._retriever = retriever
-        if client is not None:
-            self._client = client
-        else:
-            from oh_agent.agents.llm_client import create_llm_client
-
-            self._client = create_llm_client(settings)
+        self._client = client if client is not None else create_llm_client(settings)
 
     def _retrieve(self, query: str) -> list[RetrievedChunk]:
         if self._retriever and self._retriever.collection_count > 0:
@@ -545,19 +526,16 @@ class TrendAnalysisAgent:
             knowledge_context=_format_knowledge(chunks),
         )
 
-        completion = self._client.chat.completions.create(
-            model=self._settings.llm_model,
-            temperature=self._settings.llm_temperature,
-            max_tokens=self._settings.llm_max_tokens,
-            messages=[
+        raw = self._client.complete(
+            [
                 {"role": "system", "content": SYSTEM_GUARDRAIL_PROMPT},
                 {"role": "user", "content": prompt},
             ],
         )
-        raw = completion.choices[0].message.content or ""
-        check_output(raw)
-
         parsed = _parse_json(raw)
+        guardrail_result = check_parsed_content(parsed)
+        if not guardrail_result.passed:
+            raise GuardrailViolation(guardrail_result.violations)
         findings = [TrendInsight(**f) for f in parsed.get("findings", [])]
 
         result = TrendAnalysisResponse(
@@ -635,16 +613,11 @@ class ImprovementPlanAgent:
         self,
         settings: Settings,
         retriever: KnowledgeRetriever | None = None,
-        client: OpenAI | None = None,
+        client: LLMClient | None = None,
     ) -> None:
         self._settings = settings
         self._retriever = retriever
-        if client is not None:
-            self._client = client
-        else:
-            from oh_agent.agents.llm_client import create_llm_client
-
-            self._client = create_llm_client(settings)
+        self._client = client if client is not None else create_llm_client(settings)
 
     def _retrieve(self, query: str) -> list[RetrievedChunk]:
         if self._retriever and self._retriever.collection_count > 0:
@@ -680,19 +653,16 @@ class ImprovementPlanAgent:
             knowledge_context=_format_knowledge(chunks),
         )
 
-        completion = self._client.chat.completions.create(
-            model=self._settings.llm_model,
-            temperature=self._settings.llm_temperature,
-            max_tokens=self._settings.llm_max_tokens,
-            messages=[
+        raw = self._client.complete(
+            [
                 {"role": "system", "content": SYSTEM_GUARDRAIL_PROMPT},
                 {"role": "user", "content": prompt},
             ],
         )
-        raw = completion.choices[0].message.content or ""
-        check_output(raw)
-
         parsed = _parse_json(raw)
+        guardrail_result = check_parsed_content(parsed)
+        if not guardrail_result.passed:
+            raise GuardrailViolation(guardrail_result.violations)
         actions = [ImprovementAction(**a) for a in parsed.get("actions", [])]
 
         result = ImprovementPlanResponse(

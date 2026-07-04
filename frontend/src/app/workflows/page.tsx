@@ -6,6 +6,7 @@ import {
   ArrowUpCircle,
   CheckCircle2,
   ClipboardCheck,
+  Download,
   FileText,
   ListChecks,
   ShieldAlert,
@@ -25,8 +26,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { OrgHazardForm } from "@/components/org-hazard-form";
 import { api } from "@/lib/api";
+import { downloadWorkflowJson, downloadWorkflowMarkdown } from "@/lib/workflow-export";
 import type {
   HazardProfile,
   OrganisationProfile,
@@ -151,7 +159,33 @@ export default function WorkflowsPage() {
               <FileText className="h-5 w-5" />
               Generated PDCA Workflow
             </h2>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap items-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm font-medium hover:bg-muted"
+                >
+                  <Download className="h-4 w-4" />
+                  Download
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      downloadWorkflowMarkdown(result);
+                      toast.success("Workflow downloaded as Markdown");
+                    }}
+                  >
+                    Markdown (.md)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      downloadWorkflowJson(result);
+                      toast.success("Workflow downloaded as JSON");
+                    }}
+                  >
+                    JSON (.json)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Badge variant="outline">{result.model_used}</Badge>
               <Badge variant="secondary">
                 {result.knowledge_chunks_used} knowledge chunks

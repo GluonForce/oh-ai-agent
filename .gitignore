@@ -6,9 +6,12 @@ dist/
 build/
 *.egg
 
-# Virtual environments
+# Virtual environments (uv creates .venv at repo root)
 .venv/
 venv/
+
+# uv build artifacts
+.python-version.local
 
 # IDE
 .vscode/

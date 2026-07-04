@@ -27,8 +27,9 @@ from oh_agent.agents.benchmark_agent import (
     ImprovementPlanAgent,
     TrendAnalysisAgent,
 )
-from oh_agent.agents.guardrails import MANDATORY_DISCLAIMERS
+from oh_agent.agents.guardrails import MANDATORY_DISCLAIMERS, GuardrailViolation
 from oh_agent.agents.workflow_agent import WorkflowAgent
+from oh_agent.agents.llm_client import create_llm_client
 from oh_agent.config import Settings, get_settings
 from oh_agent.knowledge.ingestion import ingest_directory
 from oh_agent.knowledge.retriever import KnowledgeRetriever
@@ -148,11 +149,14 @@ async def health() -> HealthResponse:
 @app.get("/info", tags=["system"])
 async def info() -> dict[str, Any]:
     settings = _get_settings()
+    llm = create_llm_client(settings)
     return {
         "name": settings.api_title,
         "version": settings.api_version,
         "framework": "PDCA (Plan-Do-Check-Act)",
+        "llm_provider": settings.llm_provider.value,
         "llm_model": settings.llm_model,
+        "llm_resolved_model": llm.resolved_model,
         "disclaimers": MANDATORY_DISCLAIMERS,
     }
 
@@ -163,6 +167,14 @@ async def info() -> dict[str, Any]:
 
 
 def _handle_llm_error(exc: Exception) -> None:
+    if isinstance(exc, GuardrailViolation):
+        raise HTTPException(
+            422,
+            {
+                "detail": "Generated output blocked by compliance guardrails.",
+                "violations": exc.violations,
+            },
+        ) from exc
     msg = str(exc)
     if "insufficient_quota" in msg or "exceeded" in msg.lower():
         raise HTTPException(402, f"LLM quota exceeded: {msg}") from exc

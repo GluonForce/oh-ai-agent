@@ -12,14 +12,19 @@ import json
 import logging
 from typing import Any
 
-from openai import OpenAI
+from pydantic import ValidationError
+
 from uuid_extensions import uuid7
 
 from oh_agent.agents.guardrails import (
+    GuardrailViolation,
     SYSTEM_GUARDRAIL_PROMPT,
     append_disclaimers,
-    check_output,
+    check_parsed_content,
+    guardrail_retry_message,
 )
+from oh_agent.agents.workflow_parse import coerce_workflow_payload, extract_json_object
+from oh_agent.agents.llm_client import LLMClient, create_llm_client
 from oh_agent.config import Settings
 from oh_agent.knowledge.retriever import KnowledgeRetriever, RetrievedChunk
 from oh_agent.models.audit import AuditEntry, AuditEventType
@@ -152,16 +157,6 @@ def _build_knowledge_context(chunks: list[RetrievedChunk]) -> str:
     return "\n".join(parts)
 
 
-def _parse_llm_response(raw: str) -> dict[str, Any]:
-    """Extract JSON from an LLM response, tolerating markdown fences."""
-    cleaned = raw.strip()
-    if cleaned.startswith("```"):
-        lines = cleaned.split("\n")
-        lines = [ln for ln in lines if not ln.strip().startswith("```")]
-        cleaned = "\n".join(lines)
-    return json.loads(cleaned)  # type: ignore[no-any-return]
-
-
 class WorkflowAgent:
     """Generates PDCA-structured OH workflows via LLM + RAG with guardrails."""
 
@@ -169,16 +164,11 @@ class WorkflowAgent:
         self,
         settings: Settings,
         retriever: KnowledgeRetriever | None = None,
-        client: OpenAI | None = None,
+        client: LLMClient | None = None,
     ) -> None:
         self._settings = settings
         self._retriever = retriever
-        if client is not None:
-            self._client = client
-        else:
-            from oh_agent.agents.llm_client import create_llm_client
-
-            self._client = create_llm_client(settings)
+        self._client = client if client is not None else create_llm_client(settings)
 
     def generate(self, request: WorkflowRequest) -> tuple[WorkflowResponse, list[AuditEntry]]:
         """Generate a PDCA workflow and return it with its audit trail."""
@@ -249,69 +239,91 @@ class WorkflowAgent:
             knowledge_context=_build_knowledge_context(chunks),
         )
 
-        try:
-            completion = self._client.chat.completions.create(
-                model=self._settings.llm_model,
-                temperature=self._settings.llm_temperature,
-                max_tokens=self._settings.llm_max_tokens,
-                messages=[
-                    {"role": "system", "content": SYSTEM_GUARDRAIL_PROMPT},
-                    {"role": "user", "content": user_prompt},
-                ],
-            )
-            raw_output = completion.choices[0].message.content or ""
-        except Exception as exc:
-            logger.exception("LLM call failed")
-            audit_entries.append(
-                AuditEntry(
-                    event_type=AuditEventType.ERROR,
-                    request_id=request_id,
-                    detail={"error": str(exc)},
-                )
-            )
-            raise
+        messages: list[dict[str, str]] = [
+            {"role": "system", "content": SYSTEM_GUARDRAIL_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ]
+        raw_output = ""
+        parsed: dict[str, Any] = {}
+        guardrail_result = check_parsed_content({})
 
-        # Guardrail check
-        guardrail_result = check_output(raw_output)
-        if not guardrail_result.passed:
+        for attempt in range(2):
+            try:
+                raw_output = self._client.complete(messages, json_mode=True)
+            except Exception as exc:
+                logger.exception("LLM call failed")
+                audit_entries.append(
+                    AuditEntry(
+                        event_type=AuditEventType.ERROR,
+                        request_id=request_id,
+                        detail={"error": str(exc)},
+                    )
+                )
+                raise
+
+            try:
+                parsed = coerce_workflow_payload(extract_json_object(raw_output))
+            except (ValueError, TypeError, json.JSONDecodeError) as exc:
+                audit_entries.append(
+                    AuditEntry(
+                        event_type=AuditEventType.ERROR,
+                        request_id=request_id,
+                        detail={"error": f"Failed to parse LLM response: {exc}", "raw_output": raw_output[:500]},
+                    )
+                )
+                logger.error("Workflow JSON parse failed (attempt %s): %s", attempt + 1, exc)
+                raise ValueError(f"LLM returned unparseable response: {exc}") from exc
+
+            guardrail_result = check_parsed_content(parsed)
+            if guardrail_result.passed:
+                break
+
             audit_entries.append(
                 AuditEntry(
                     event_type=AuditEventType.GUARDRAIL_TRIGGERED,
                     request_id=request_id,
-                    detail={"violations": guardrail_result.violations},
-                    guardrails_applied=["clinical_decision_check", "prohibited_phrase_check"],
+                    detail={"violations": guardrail_result.violations, "attempt": attempt + 1},
+                    guardrails_applied=["clinical_assertion_check", "prohibited_phrase_check"],
                 )
             )
-            logger.warning("Guardrails triggered for request %s: %s", request_id, guardrail_result.violations)
+            logger.warning(
+                "Guardrails triggered for request %s (attempt %s): %s",
+                request_id,
+                attempt + 1,
+                guardrail_result.violations,
+            )
+            if attempt == 0:
+                messages.append({"role": "assistant", "content": raw_output})
+                messages.append({"role": "user", "content": guardrail_retry_message()})
+            else:
+                raise GuardrailViolation(guardrail_result.violations)
 
-        # Parse structured response
         try:
-            parsed = _parse_llm_response(raw_output)
-        except (json.JSONDecodeError, KeyError) as exc:
+            # PLAN
+            risk_profile_data = parsed.get("risk_profile")
+            risk_profile = RiskProfileSummary(**risk_profile_data) if risk_profile_data else None
+
+            # DO
+            surveillance = [SurveillanceProvision(**s) for s in parsed.get("surveillance_provisions", [])]
+            steps = [WorkflowStep(**s) for s in parsed.get("steps", [])]
+            governance = [GovernancePrompt(**g) for g in parsed.get("governance_prompts", [])]
+
+            # CHECK
+            assurance = [AssuranceCheckItem(**a) for a in parsed.get("assurance_checks", [])]
+            trends = [TrendInsight(**t) for t in parsed.get("trend_insights", [])]
+
+            # ACT
+            improvements = [ImprovementAction(**ia) for ia in parsed.get("improvement_actions", [])]
+        except ValidationError as exc:
+            logger.error("Workflow schema validation failed: %s", exc.errors())
             audit_entries.append(
                 AuditEntry(
                     event_type=AuditEventType.ERROR,
                     request_id=request_id,
-                    detail={"error": f"Failed to parse LLM response: {exc}", "raw_output": raw_output[:500]},
+                    detail={"error": "schema_validation", "validation_errors": exc.errors()},
                 )
             )
-            raise ValueError(f"LLM returned unparseable response: {exc}") from exc
-
-        # PLAN
-        risk_profile_data = parsed.get("risk_profile")
-        risk_profile = RiskProfileSummary(**risk_profile_data) if risk_profile_data else None
-
-        # DO
-        surveillance = [SurveillanceProvision(**s) for s in parsed.get("surveillance_provisions", [])]
-        steps = [WorkflowStep(**s) for s in parsed.get("steps", [])]
-        governance = [GovernancePrompt(**g) for g in parsed.get("governance_prompts", [])]
-
-        # CHECK
-        assurance = [AssuranceCheckItem(**a) for a in parsed.get("assurance_checks", [])]
-        trends = [TrendInsight(**t) for t in parsed.get("trend_insights", [])]
-
-        # ACT
-        improvements = [ImprovementAction(**ia) for ia in parsed.get("improvement_actions", [])]
+            raise ValueError(f"LLM response did not match workflow schema: {exc}") from exc
 
         sources = parsed.get("sources_cited", [])
         hazard_summary = "; ".join(h.hazard_phrase for h in request.hazards)
