@@ -164,9 +164,12 @@ The app has no user accounts. Without protection, anyone with the link can spend
 
 ### Railway deploy fails health check
 
-- Ensure the volume is mounted at `/app/data`.
-- Check logs for ChromaDB or ingestion errors.
-- Verify `OH_LLM_API_KEY` is set (workflow endpoints need it; `/health` should still work).
+- Ensure the volume is mounted at `/app/data` and env vars point inside it:
+  - `OH_CHROMA_PERSIST_DIR=/app/data/chroma`
+  - `OH_AUDIT_LOG_FILE=/app/data/logs/audit.jsonl`
+- Check **Deploy Logs** (not just build logs) for `Permission denied` or ChromaDB errors.
+- First deploy can take 1–2 minutes; health check timeout is 300s.
+- Open `https://YOUR-URL/health` manually after deploy — should return `"status": "healthy"`.
 
 ### 402 / 502 on workflow generation
 

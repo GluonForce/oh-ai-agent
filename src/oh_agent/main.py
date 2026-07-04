@@ -11,9 +11,10 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -87,17 +88,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     retriever = KnowledgeRetriever(settings)
     audit = AuditService(settings)
 
-    # Auto-ingest knowledge base on startup
-    if settings.knowledge_dir.exists():
-        count = ingest_directory(settings, retriever)
-        logger.info("Ingested %d chunks from knowledge base on startup.", count)
-
     _state["settings"] = settings
     _state["retriever"] = retriever
     _state["audit"] = audit
 
+    async def ingest_in_background() -> None:
+        if not settings.knowledge_dir.exists():
+            return
+        try:
+            count = await asyncio.to_thread(ingest_directory, settings, retriever)
+            logger.info("Ingested %d chunks from knowledge base on startup.", count)
+        except Exception:
+            logger.exception("Knowledge base ingestion failed on startup.")
+
+    ingest_task = asyncio.create_task(ingest_in_background())
+
     logger.info("OH AI Agent started (env=%s, model=%s).", settings.environment.value, settings.llm_model)
     yield
+
+    ingest_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await ingest_task
     logger.info("OH AI Agent shutting down.")
 
 

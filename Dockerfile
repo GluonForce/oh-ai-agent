@@ -20,14 +20,16 @@ RUN uv sync --frozen --no-dev \
     && mkdir -p logs data/chroma data/logs \
     && chown -R ohagent:ohagent /app
 
-USER ohagent
+COPY docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PORT=8000
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s \
     CMD python -c "import os, httpx; port=os.environ.get('PORT','8000'); r=httpx.get(f'http://localhost:{port}/health'); r.raise_for_status()"
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["sh", "-c", "uvicorn oh_agent.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
