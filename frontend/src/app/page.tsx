@@ -13,7 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { api } from "@/lib/api";
+import { api, API_BASE } from "@/lib/api";
 import type { HealthResponse, InfoResponse } from "@/lib/types";
 
 export default function DashboardPage() {
@@ -37,8 +37,10 @@ export default function DashboardPage() {
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Failed to connect to API: {error}. Ensure the backend is running on{" "}
-            <code className="text-xs">http://localhost:8000</code>.
+            Failed to connect to API: {error}. Check that the backend is reachable
+            (configured via{" "}
+            <code className="text-xs">NEXT_PUBLIC_API_URL</code>, proxy:{" "}
+            <code className="text-xs">{API_BASE}</code>).
           </AlertDescription>
         </Alert>
       </div>

@@ -1,12 +1,27 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+/**
+ * Resolve API base URL.
+ * Production: same-origin proxy via Next.js rewrites (avoids CORS).
+ * Local dev: direct connection to localhost backend.
+ */
+export function resolveApiBase(): string {
+  const remote = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (remote) {
+    return "/api/backend";
+  }
+  return "http://localhost:8000";
+}
 
-async function request<T>(
-  path: string,
-  options?: RequestInit
-): Promise<T> {
+export const API_BASE = resolveApiBase();
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers = new Headers(options?.headers);
+  if (options?.body != null && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
+    headers,
   });
   if (!res.ok) {
     const body = await res.text();

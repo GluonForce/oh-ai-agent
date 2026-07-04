@@ -108,6 +108,8 @@ Before the first deploy, add:
 | `NEXT_PUBLIC_API_URL` | `https://YOUR-RAILWAY-URL.up.railway.app` |
 | `SITE_PASSWORD` | A shared demo password (recommended — free lock screen) |
 
+The frontend proxies API calls through `/api/backend` on the same Vercel origin (no browser CORS issues). `NEXT_PUBLIC_API_URL` is used by Next.js rewrites at build time.
+
 Set this for **Production**, **Preview**, and **Development** so all builds use the correct backend.
 
 > `NEXT_PUBLIC_*` variables are baked in at build time. After changing this value, trigger a **Redeploy** on Vercel.
@@ -159,7 +161,8 @@ The app has no user accounts. Without protection, anyone with the link can spend
 ### Dashboard shows backend unreachable
 
 - Confirm `NEXT_PUBLIC_API_URL` matches the Railway public URL (no trailing slash).
-- Redeploy Vercel after changing the env var.
+- **Redeploy Vercel** after changing env vars (build-time).
+- In DevTools → Network, requests should go to `/api/backend/health` on your Vercel domain (not `localhost`).
 - Check Railway logs for startup errors.
 
 ### Railway deploy fails health check
