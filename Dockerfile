@@ -14,10 +14,9 @@ COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
 COPY knowledge_base/ ./knowledge_base/
 
-RUN uv sync --frozen --no-dev && mkdir -p /app/data/chroma /app/data/logs /app/logs
-
-# Pre-download ChromaDB embedding model (~80MB) so Railway boot is instant.
-RUN python -c "\
+RUN uv sync --frozen --no-dev \
+    && mkdir -p /app/data/chroma /app/data/logs /app/logs \
+    && uv run python -c "\
 import chromadb; \
 client = chromadb.PersistentClient(path='/tmp/chroma-warmup'); \
 col = client.get_or_create_collection('warmup'); \
