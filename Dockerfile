@@ -12,7 +12,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 FROM base AS runtime
 
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
 COPY knowledge_base/ ./knowledge_base/
 
