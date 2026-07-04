@@ -37,10 +37,10 @@ export default function DashboardPage() {
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Failed to connect to API: {error}. Check that the backend is reachable
-            (configured via{" "}
-            <code className="text-xs">NEXT_PUBLIC_API_URL</code>, proxy:{" "}
-            <code className="text-xs">{API_BASE}</code>).
+            Failed to connect to API: {error}. Backend URL:{" "}
+            <code className="text-xs">{API_BASE}</code>. Open that URL
+            with <code className="text-xs">/health</code> in a new tab to test
+            Railway directly, then redeploy both Railway and Vercel.
           </AlertDescription>
         </Alert>
       </div>

@@ -103,12 +103,14 @@ First startup may take 30–60 seconds while documents in `knowledge_base/` are 
 
 Before the first deploy, add:
 
+The frontend calls the Railway API **directly from the browser** (no Vercel proxy). Set `NEXT_PUBLIC_API_URL` to your public Railway URL — **https**, no trailing slash.
+
 | Variable | Value |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | `https://YOUR-RAILWAY-URL.up.railway.app` |
 | `SITE_PASSWORD` | A shared demo password (recommended — free lock screen) |
 
-The frontend proxies API calls through `/api/backend` on the same Vercel origin (no browser CORS issues). `NEXT_PUBLIC_API_URL` is used by Next.js rewrites at build time.
+Set both for **Production**, **Preview**, and **Development**, then **Redeploy** (build-time variable).
 
 Set this for **Production**, **Preview**, and **Development** so all builds use the correct backend.
 
@@ -158,12 +160,15 @@ The app has no user accounts. Without protection, anyone with the link can spend
 
 ## Troubleshooting
 
-### Dashboard shows backend unreachable
+### Dashboard shows backend unreachable / API 502
 
-- Confirm `NEXT_PUBLIC_API_URL` matches the Railway public URL (no trailing slash).
-- **Redeploy Vercel** after changing env vars (build-time).
-- In DevTools → Network, requests should go to `/api/backend/health` on your Vercel domain (not `localhost`).
-- Check Railway logs for startup errors.
+1. Open `https://YOUR-RAILWAY-URL/health` **directly in a browser** (not via Vercel).
+   - If this fails → fix Railway first (logs, volume, env vars).
+   - If this works → redeploy **Vercel** after setting `NEXT_PUBLIC_API_URL`.
+2. Confirm `NEXT_PUBLIC_API_URL` is **https**, matches Railway exactly, **no trailing slash**.
+3. Redeploy **Railway** after backend code changes (CORS fix requires latest deploy).
+4. In DevTools → Network, requests should go to `https://...up.railway.app/health`, not `localhost` or `/api/backend`.
+5. Check Railway **Deploy Logs** for crashes (OOM, permission errors).
 
 ### Railway deploy fails health check
 

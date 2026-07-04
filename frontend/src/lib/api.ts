@@ -1,14 +1,6 @@
-/**
- * Resolve API base URL.
- * Production: same-origin proxy via Next.js rewrites (avoids CORS).
- * Local dev: direct connection to localhost backend.
- */
+/** Backend URL for browser requests (requires CORS on the API). */
 export function resolveApiBase(): string {
-  const remote = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
-  if (remote) {
-    return "/api/backend";
-  }
-  return "http://localhost:8000";
+  return process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
 }
 
 export const API_BASE = resolveApiBase();
