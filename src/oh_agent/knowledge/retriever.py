@@ -10,10 +10,10 @@ from __future__ import annotations
 import hashlib
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import chromadb
-from chromadb.config import Settings as ChromaSettings
 
 from oh_agent.config import Settings
 
@@ -37,13 +37,9 @@ class KnowledgeRetriever:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         persist_dir = str(settings.chroma_persist_dir)
-        self._client = chromadb.Client(
-            ChromaSettings(
-                anonymized_telemetry=False,
-                is_persistent=True,
-                persist_directory=persist_dir,
-            )
-        )
+        persist_path = Path(persist_dir)
+        persist_path.mkdir(parents=True, exist_ok=True)
+        self._client = chromadb.PersistentClient(path=persist_dir)
         self._collection = self._client.get_or_create_collection(
             name=settings.chroma_collection,
             metadata={"hnsw:space": "cosine"},

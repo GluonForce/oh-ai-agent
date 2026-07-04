@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -59,6 +60,8 @@ logger = logging.getLogger(__name__)
 # Application state (populated during lifespan)
 # ---------------------------------------------------------------------------
 _state: dict[str, Any] = {}
+_retriever_lock = threading.Lock()
+_audit_lock = threading.Lock()
 
 
 def _get_settings() -> Settings:
@@ -66,44 +69,54 @@ def _get_settings() -> Settings:
 
 
 def _get_retriever() -> KnowledgeRetriever:
+    """Lazy-init ChromaDB on first use (avoids ~80MB model download on boot)."""
     r = _state.get("retriever")
-    if r is None:
-        raise HTTPException(503, "Knowledge retriever not initialised.")
-    return r  # type: ignore[return-value]
+    if r is not None:
+        return r  # type: ignore[return-value]
+    with _retriever_lock:
+        r = _state.get("retriever")
+        if r is not None:
+            return r  # type: ignore[return-value]
+        settings = _get_settings()
+        logger.info("Initialising knowledge store (first use; may take a moment)...")
+        r = KnowledgeRetriever(settings)
+        _state["retriever"] = r
+        return r  # type: ignore[return-value]
 
 
 def _get_audit() -> AuditService:
     a = _state.get("audit")
-    if a is None:
-        raise HTTPException(503, "Audit service not initialised.")
-    return a  # type: ignore[return-value]
+    if a is not None:
+        return a  # type: ignore[return-value]
+    with _audit_lock:
+        a = _state.get("audit")
+        if a is not None:
+            return a  # type: ignore[return-value]
+        a = AuditService(_get_settings())
+        _state["audit"] = a
+        return a  # type: ignore[return-value]
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Initialise shared services on startup."""
+    """Minimal startup — heavy services load on first request."""
     settings = get_settings()
     logging.basicConfig(level=settings.log_level, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-
-    retriever = KnowledgeRetriever(settings)
-    audit = AuditService(settings)
-
     _state["settings"] = settings
-    _state["retriever"] = retriever
-    _state["audit"] = audit
 
-    async def ingest_in_background() -> None:
-        if not settings.knowledge_dir.exists():
+    async def maybe_ingest() -> None:
+        if not settings.ingest_on_startup or not settings.knowledge_dir.exists():
             return
         try:
+            retriever = await asyncio.to_thread(_get_retriever)
             count = await asyncio.to_thread(ingest_directory, settings, retriever)
             logger.info("Ingested %d chunks from knowledge base on startup.", count)
         except Exception:
             logger.exception("Knowledge base ingestion failed on startup.")
 
-    ingest_task = asyncio.create_task(ingest_in_background())
+    ingest_task = asyncio.create_task(maybe_ingest())
 
-    logger.info("OH AI Agent started (env=%s, model=%s).", settings.environment.value, settings.llm_model)
+    logger.info("OH AI Agent listening (env=%s, model=%s).", settings.environment.value, settings.llm_model)
     yield
 
     ingest_task.cancel()
@@ -147,13 +160,13 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
 async def health() -> HealthResponse:
-    settings = _get_settings()
-    retriever = _get_retriever()
-    audit = _get_audit()
+    settings = _state.get("settings") or get_settings()
+    retriever = _state.get("retriever")
+    audit = _state.get("audit")
     return HealthResponse(
         environment=settings.environment.value,
-        knowledge_chunks=retriever.collection_count,
-        audit_entries=audit.count(),
+        knowledge_chunks=retriever.collection_count if retriever else 0,
+        audit_entries=audit.count() if audit else 0,
     )
 
 

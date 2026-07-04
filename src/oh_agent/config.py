@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     retrieval_top_k: int = 8
     chunk_size: int = 800
     chunk_overlap: int = 200
+    ingest_on_startup: bool = Field(
+        default=True,
+        description="Ingest knowledge_base on startup. Set false on Railway to boot faster.",
+    )
 
     # --- Audit ---
     audit_log_file: Path = Path("logs/audit.jsonl")

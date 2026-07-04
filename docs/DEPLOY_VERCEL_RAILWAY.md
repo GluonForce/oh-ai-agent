@@ -62,6 +62,7 @@ In the Railway service → **Variables**, add:
 | `OH_LLM_MODEL` | `openai/gpt-4o-mini` | Cost-effective default |
 | `OH_CHROMA_PERSIST_DIR` | `/app/data/chroma` | On the mounted volume |
 | `OH_AUDIT_LOG_FILE` | `/app/data/logs/audit.jsonl` | On the mounted volume |
+| `OH_INGEST_ON_STARTUP` | `false` | **Important** — avoids 80MB model download + ingest on boot |
 
 Optional:
 
@@ -169,6 +170,35 @@ The app has no user accounts. Without protection, anyone with the link can spend
 3. Redeploy **Railway** after backend code changes (CORS fix requires latest deploy).
 4. In DevTools → Network, requests should go to `https://...up.railway.app/health`, not `localhost` or `/api/backend`.
 5. Check Railway **Deploy Logs** for crashes (OOM, permission errors).
+
+### Railway shows "Application failed to respond"
+
+This means Railway’s edge cannot reach your container. Check **Deploy Logs** (not build logs):
+
+**ChromaDB downloading `all-MiniLM-L6-v2` (~80MB) on startup** — this is the most common cause. Progress bars in logs marked `"severity": "error"` are normal (tqdm on stderr). Fix:
+
+1. Set `OH_INGEST_ON_STARTUP=false` on Railway.
+2. Push latest code (lazy Chroma init + model pre-baked in Docker image).
+3. Redeploy and wait ~30s, then test `/health`.
+
+Other checks:
+
+1. Look for `Starting OH AI Agent on 0.0.0.0:XXXX` — confirms uvicorn bound to Railway’s PORT.
+2. Look for `OH AI Agent listening` — app started.
+3. Look for Python **Traceback** or **Killed** (OOM) — paste into an issue if present.
+
+**Required Railway variables:**
+
+```bash
+OH_ENVIRONMENT=production
+OH_CHROMA_PERSIST_DIR=/app/data/chroma
+OH_AUDIT_LOG_FILE=/app/data/logs/audit.jsonl
+OH_INGEST_ON_STARTUP=false
+```
+
+**Volume:** mount at `/app/data` (Settings → Volumes).
+
+After pushing the latest code, redeploy Railway, wait ~30s, then test `/health` again.
 
 ### Railway deploy fails health check
 
