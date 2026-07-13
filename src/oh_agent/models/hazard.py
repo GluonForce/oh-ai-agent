@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class HazardCategory(StrEnum):
@@ -71,9 +71,8 @@ class HazardProfile(BaseModel):
     """
 
     category: HazardCategory
-    hazard_phrase: str = Field(
-        ...,
-        min_length=1,
+    hazard_phrase: str | None = Field(
+        default=None,
         max_length=512,
         description="Standardised hazard phrase (e.g. H-phrase) or free-text description.",
     )
@@ -100,6 +99,13 @@ class HazardProfile(BaseModel):
         description="Current control measures in place and their assessed reliability.",
     )
     notes: str | None = Field(default=None, max_length=2048)
+
+    @model_validator(mode="after")
+    def requires_hazard_description(self) -> HazardProfile:
+        """Require either a hazard phrase or a specific substance/agent."""
+        if not any(value and value.strip() for value in (self.hazard_phrase, self.substance_or_agent)):
+            raise ValueError("At least one of hazard_phrase or substance_or_agent must be non-empty.")
+        return self
 
 
 class RiskAssessmentConfirmation(BaseModel):

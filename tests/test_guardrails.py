@@ -9,6 +9,7 @@ from oh_agent.agents.guardrails import (
     check_output,
     check_parsed_content,
 )
+from oh_agent.agents.workflow_agent import WORKFLOW_CONSISTENCY_RULES
 
 
 class TestCheckOutput:
@@ -119,3 +120,19 @@ class TestSystemPrompt:
         assert "exposure monitoring" in lower
         assert "ethical boundaries" in lower
         assert "hswa 1974" in lower
+
+    def test_guardrail_prompt_requires_consistent_roles_and_terminology(self) -> None:
+        lower = SYSTEM_GUARDRAIL_PROMPT.lower()
+        assert "consistent role assignments across surveillance provisions and workflow steps" in lower
+        assert "interpretation requires an oh professional" in lower
+        assert "audiometry, not colloquial 'hearing test'" in lower
+
+
+class TestWorkflowConsistencyRules:
+    def test_rules_cover_roles_terminology_and_section_purpose(self) -> None:
+        lower = " ".join(WORKFLOW_CONSISTENCY_RULES.lower().split())
+        assert "audiometry" in lower
+        assert "competence_required and responsible_role" in lower
+        assert "interpretation requires an oh professional" in lower
+        assert "statutory checks and competence requirements" in lower
+        assert "operational sequence" in lower

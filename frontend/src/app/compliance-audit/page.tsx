@@ -129,6 +129,8 @@ export default function ComplianceAuditPage() {
               {boolIndicator(result.employee_coverage_assessed, "Employee Coverage Assessed")}
               {boolIndicator(result.interval_adherence_assessed, "Interval Adherence Assessed")}
               {boolIndicator(result.governance_assessed, "Governance Assessed")}
+              {boolIndicator(result.methodology_assessed, "Methodology Appropriate")}
+              {boolIndicator(result.escalation_process_assessed, "Escalation Process Assessed")}
             </CardContent>
           </Card>
 

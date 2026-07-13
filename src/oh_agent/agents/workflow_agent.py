@@ -13,18 +13,17 @@ import logging
 from typing import Any
 
 from pydantic import ValidationError
-
 from uuid_extensions import uuid7
 
 from oh_agent.agents.guardrails import (
-    GuardrailViolation,
     SYSTEM_GUARDRAIL_PROMPT,
+    GuardrailViolation,
     append_disclaimers,
     check_parsed_content,
     guardrail_retry_message,
 )
-from oh_agent.agents.workflow_parse import coerce_workflow_payload, extract_json_object
 from oh_agent.agents.llm_client import LLMClient, create_llm_client
+from oh_agent.agents.workflow_parse import coerce_workflow_payload, extract_json_object
 from oh_agent.config import Settings
 from oh_agent.knowledge.retriever import KnowledgeRetriever, RetrievedChunk
 from oh_agent.models.audit import AuditEntry, AuditEventType
@@ -41,6 +40,19 @@ from oh_agent.models.workflow import (
 )
 
 logger = logging.getLogger(__name__)
+
+WORKFLOW_CONSISTENCY_RULES = """\
+## Workflow consistency rules
+- Use canonical terminology: call the surveillance activity "audiometry", not a
+  colloquial "hearing test", and use the defined surveillance type names consistently.
+- Use the same competence_required and responsible_role vocabulary across
+  surveillance_provisions and workflow_steps; do not assign contradictory roles.
+- An OH Technician (OHT) may administer questionnaires, but interpretation requires
+  an OH professional (OHN/OHP) in line with HSE-safe delegation.
+- Keep the sections distinct: surveillance_provisions define statutory checks and
+  competence requirements; workflow_steps define the operational sequence that
+  delivers them.
+"""
 
 _WORKFLOW_USER_TEMPLATE = """\
 Generate a PDCA-structured (Plan-Do-Check-Act) occupational health \
@@ -66,6 +78,8 @@ workflow for the following organisation and hazard profile.
 
 ## Retrieved knowledge (use these as evidence basis)
 {knowledge_context}
+
+{workflow_consistency_rules}
 
 ## Instructions — PDCA Framework
 Generate a structured workflow following Plan-Do-Check-Act. Respond \
@@ -237,6 +251,7 @@ class WorkflowAgent:
             hazards_block=_build_hazards_block(request),
             additional_context=request.additional_context or "None",
             knowledge_context=_build_knowledge_context(chunks),
+            workflow_consistency_rules=WORKFLOW_CONSISTENCY_RULES,
         )
 
         messages: list[dict[str, str]] = [

@@ -320,6 +320,8 @@ Assess compliance across these areas:
 1. Employee coverage — are all exposed employees identified and included?
 2. Interval adherence — are surveillance intervals meeting regulatory minimums?
 3. Governance — is there adequate oversight, delegation, and competence assurance?
+4. Methodology — is the surveillance methodology appropriate for the identified risks?
+5. Escalation process — are abnormal findings escalated through appropriate pathways?
 
 For each audit item, provide:
 - area: the compliance area
@@ -345,6 +347,8 @@ Respond ONLY with valid JSON:
   "employee_coverage_assessed": true,
   "interval_adherence_assessed": true,
   "governance_assessed": true,
+  "methodology_assessed": true,
+  "escalation_process_assessed": true,
   "sources_cited": ["..."]
 }}"""
 
@@ -417,6 +421,8 @@ class ComplianceAuditAgent:
             employee_coverage_assessed=parsed.get("employee_coverage_assessed", False),
             interval_adherence_assessed=parsed.get("interval_adherence_assessed", False),
             governance_assessed=parsed.get("governance_assessed", False),
+            methodology_assessed=parsed.get("methodology_assessed", False),
+            escalation_process_assessed=parsed.get("escalation_process_assessed", False),
             sources_cited=parsed.get("sources_cited", []),
             model_used=self._settings.llm_model,
         )
@@ -458,6 +464,7 @@ using a PDCA framework.
 {knowledge_context}
 
 ## Instructions
+Reject or flag identifiable or PII data, and warn of small-cell triangulation risks.
 For each finding, provide:
 - area: the surveillance/health area
 - observation: what the data shows

@@ -20,6 +20,7 @@ class DeliveryModel(StrEnum):
     OHN_LED = "ohn_led"  # Occupational Health Nurse-led
     TECHNICIAN = "technician"  # Technician-delivered
     MIXED = "mixed"  # Combination
+    NONE = "none"  # No OH service currently in place
 
 
 class OrganisationProfile(BaseModel):

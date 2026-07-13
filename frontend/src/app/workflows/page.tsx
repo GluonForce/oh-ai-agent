@@ -203,6 +203,10 @@ export default function WorkflowsPage() {
               <TabsTrigger value="check">CHECK</TabsTrigger>
               <TabsTrigger value="act">ACT</TabsTrigger>
             </TabsList>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Surveillance Provisions = statutory checks &amp; competence requirements. Workflow Steps =
+              operational sequence to deliver them.
+            </p>
 
             {/* PLAN */}
             <TabsContent value="plan">

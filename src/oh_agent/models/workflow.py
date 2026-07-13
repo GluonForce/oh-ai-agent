@@ -296,6 +296,8 @@ class ComplianceAuditResponse(BaseModel):
     employee_coverage_assessed: bool = False
     interval_adherence_assessed: bool = False
     governance_assessed: bool = False
+    methodology_assessed: bool = False
+    escalation_process_assessed: bool = False
     sources_cited: list[str] = Field(default_factory=list)
     model_used: str = ""
 

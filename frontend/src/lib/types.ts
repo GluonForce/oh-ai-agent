@@ -32,7 +32,7 @@ export type ExposureDuration =
   | "long"
   | "extended";
 
-export type DeliveryModel = "ohp_led" | "ohn_led" | "technician" | "mixed";
+export type DeliveryModel = "ohp_led" | "ohn_led" | "technician" | "mixed" | "none";
 
 export type WorkflowComponent =
   | "health_questionnaire"
@@ -79,7 +79,7 @@ export type AuditEventType =
 
 export interface HazardProfile {
   category: HazardCategory;
-  hazard_phrase: string;
+  hazard_phrase?: string;
   substance_or_agent?: string;
   exposure_level: ExposureLevel;
   exposure_frequency: ExposureFrequency;
@@ -299,6 +299,8 @@ export interface ComplianceAuditResponse {
   employee_coverage_assessed: boolean;
   interval_adherence_assessed: boolean;
   governance_assessed: boolean;
+  methodology_assessed: boolean;
+  escalation_process_assessed: boolean;
   sources_cited: string[];
   model_used: string;
 }

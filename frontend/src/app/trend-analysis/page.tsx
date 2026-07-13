@@ -79,7 +79,14 @@ export default function TrendAnalysisPage() {
           <CardTitle className="text-base">Surveillance Summary *</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
+          <div className="space-y-4">
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Use anonymised data only</AlertTitle>
+              <AlertDescription>
+                Do not include identifiable or personal data. Avoid small groups whose combined details could enable triangulation of an individual.
+              </AlertDescription>
+            </Alert>
             <Label htmlFor="surveillance-summary">
               Provide a summary of your surveillance data for analysis
             </Label>

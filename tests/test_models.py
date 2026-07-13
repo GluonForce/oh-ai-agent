@@ -17,6 +17,7 @@ from oh_agent.models.organisation import DeliveryModel, OrganisationProfile
 from oh_agent.models.workflow import (
     AssuranceCheckItem,
     BenchmarkResult,
+    ComplianceAuditResponse,
     ComplianceRating,
     GapAnalysis,
     GapItem,
@@ -44,12 +45,34 @@ class TestHazardProfile:
         assert hp.category == HazardCategory.CHEMICAL
         assert hp.exposure_level == ExposureLevel.HIGH
 
-    def test_empty_hazard_phrase_rejected(self) -> None:
+    def test_empty_hazard_phrase_accepted_with_substance(self) -> None:
+        hp = HazardProfile(
+            category=HazardCategory.CHEMICAL,
+            hazard_phrase="",
+            substance_or_agent="isocyanates",
+        )
+        assert hp.substance_or_agent == "isocyanates"
+
+    def test_missing_hazard_phrase_rejected_without_substance(self) -> None:
+        with pytest.raises(ValidationError):
+            HazardProfile(
+                category=HazardCategory.CHEMICAL,
+            )
+
+    def test_empty_hazard_phrase_rejected_without_substance(self) -> None:
         with pytest.raises(ValidationError):
             HazardProfile(
                 category=HazardCategory.CHEMICAL,
                 hazard_phrase="",
             )
+
+    def test_valid_hazard_with_only_substance(self) -> None:
+        hp = HazardProfile(
+            category=HazardCategory.CHEMICAL,
+            substance_or_agent="isocyanates",
+        )
+        assert hp.hazard_phrase is None
+        assert hp.substance_or_agent == "isocyanates"
 
     def test_defaults(self) -> None:
         hp = HazardProfile(
@@ -104,6 +127,14 @@ class TestOrganisationProfile:
         )
         assert org.risk_assessment_confirmed is True
         assert org.workers_consulted is True
+
+    def test_delivery_model_none_accepted(self) -> None:
+        org = OrganisationProfile(
+            name="Test",
+            sector="test",
+            delivery_model=DeliveryModel.NONE,
+        )
+        assert org.delivery_model == DeliveryModel.NONE
 
 
 class TestWorkflowModels:
@@ -273,6 +304,28 @@ class TestBenchmarkModels:
             recommendations=["Implement biological monitoring"],
         )
         assert len(br.non_compliant_areas) == 1
+
+
+class TestComplianceAuditModels:
+    def test_defaults(self) -> None:
+        response = ComplianceAuditResponse(
+            request_id="test-compliance-audit",
+            organisation_name="Test Org",
+        )
+        assert response.methodology_assessed is False
+        assert response.escalation_process_assessed is False
+
+    def test_new_assessment_fields_validate(self) -> None:
+        response = ComplianceAuditResponse.model_validate(
+            {
+                "request_id": "test-compliance-audit",
+                "organisation_name": "Test Org",
+                "methodology_assessed": True,
+                "escalation_process_assessed": True,
+            }
+        )
+        assert response.methodology_assessed is True
+        assert response.escalation_process_assessed is True
 
 
 class TestAuditModels:
