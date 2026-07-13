@@ -558,7 +558,11 @@ export function OrgHazardForm({
               <Save className="mr-1 h-3.5 w-3.5" /> Save draft
             </Button>
             {namedDrafts.length > 0 && (
-              <Select onValueChange={(id) => id && handleLoadNamed(id)}>
+              <Select
+                onValueChange={(id: string | null) => {
+                  if (id) handleLoadNamed(id);
+                }}
+              >
                 <SelectTrigger className="h-8 w-40">
                   <SelectValue placeholder="Load draft" />
                 </SelectTrigger>
