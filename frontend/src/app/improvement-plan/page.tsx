@@ -16,9 +16,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Callout } from "@/components/callout";
 import { OrgHazardForm } from "@/components/org-hazard-form";
+import { PageHeader } from "@/components/page-header";
 import { SourcesCitedList } from "@/components/sources-cited";
+import { StatusBadge } from "@/components/status-badge";
 import { api } from "@/lib/api";
+import { priorityTone } from "@/lib/status-styles";
 import type {
   HazardProfile,
   OrganisationProfile,
@@ -61,19 +65,13 @@ export default function ImprovementPlanPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ArrowUpCircle className="h-6 w-6" />
-          Improvement Plan
-          <Badge variant="secondary" className="text-xs">ACT</Badge>
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Generate prioritised improvement actions based on surveillance
-          findings and regulatory requirements. This ACT-phase tool helps close
-          the PDCA loop with concrete, auditable recommendations.
-        </p>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        title="Improvement Plan"
+        icon={ArrowUpCircle}
+        phase="ACT"
+        description="Generate prioritised improvement actions based on surveillance findings and regulatory requirements. This ACT-phase tool helps close the PDCA loop with concrete, auditable recommendations."
+      />
 
       <Card>
         <CardHeader>
@@ -146,18 +144,9 @@ export default function ImprovementPlanPage() {
                         <TableCell className="text-sm">{a.action}</TableCell>
                         <TableCell className="hidden lg:table-cell text-sm">{a.rationale}</TableCell>
                         <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              a.priority === "high"
-                                ? "bg-red-100 text-red-800 border-red-300"
-                                : a.priority === "medium"
-                                  ? "bg-amber-100 text-amber-800 border-amber-300"
-                                  : "bg-green-100 text-green-800 border-green-300"
-                            }
-                          >
+                          <StatusBadge tone={priorityTone(a.priority)}>
                             {a.priority}
-                          </Badge>
+                          </StatusBadge>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                           {a.regulatory_reference || "—"}
@@ -175,14 +164,12 @@ export default function ImprovementPlanPage() {
               <CardHeader>
                 <CardTitle className="text-base">Management Review Items</CardTitle>
               </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {result.management_review_items.map((item, i) => (
-                    <li key={i} className="text-sm text-muted-foreground border-l-2 border-amber-500 pl-3">
-                      {item}
-                    </li>
+              <CardContent className="space-y-2">
+                {result.management_review_items.map((item, i) => (
+                    <Callout key={i} tone="warning">
+                      <p className="text-sm text-muted-foreground">{item}</p>
+                    </Callout>
                   ))}
-                </ul>
               </CardContent>
             </Card>
           )}

@@ -161,7 +161,7 @@ function MultiCheck({
     else onChange(selected.filter((s) => s !== opt));
   };
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+    <div className="grid max-h-48 grid-cols-1 gap-2 overflow-y-auto rounded-md border border-border/80 bg-muted/20 p-2 sm:grid-cols-2 sm:max-h-56">
       {options.map((opt) => {
         const id = `${idPrefix}-${opt.slice(0, 24)}`;
         return (

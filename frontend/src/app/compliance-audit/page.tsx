@@ -15,8 +15,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { OrgHazardForm } from "@/components/org-hazard-form";
+import { PageHeader } from "@/components/page-header";
 import { SourcesCitedList } from "@/components/sources-cited";
+import { StatusBadge } from "@/components/status-badge";
 import { api } from "@/lib/api";
+import { complianceTone, statusIconClass } from "@/lib/status-styles";
 import type {
   HazardProfile,
   OrganisationProfile,
@@ -24,19 +27,17 @@ import type {
   ComplianceRating,
 } from "@/lib/types";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 function ratingBadge(rating: ComplianceRating) {
-  const variants: Record<ComplianceRating, { label: string; cls: string }> = {
-    compliant: { label: "Compliant", cls: "bg-green-100 text-green-800 border-green-300" },
-    partially_compliant: { label: "Partial", cls: "bg-amber-100 text-amber-800 border-amber-300" },
-    non_compliant: { label: "Non-Compliant", cls: "bg-red-100 text-red-800 border-red-300" },
-    not_assessed: { label: "Not Assessed", cls: "bg-gray-100 text-gray-800 border-gray-300" },
+  const labels: Record<ComplianceRating, string> = {
+    compliant: "Compliant",
+    partially_compliant: "Partial",
+    non_compliant: "Non-Compliant",
+    not_assessed: "Not Assessed",
   };
-  const v = variants[rating];
   return (
-    <Badge variant="outline" className={v.cls}>
-      {v.label}
-    </Badge>
+    <StatusBadge tone={complianceTone(rating)}>{labels[rating]}</StatusBadge>
   );
 }
 
@@ -44,9 +45,9 @@ function boolIndicator(value: boolean, label: string) {
   return (
     <div className="flex items-center gap-2 text-sm">
       {value ? (
-        <CheckCircle2 className="h-4 w-4 text-green-500" />
+        <CheckCircle2 className={cn("h-4 w-4", statusIconClass("success"))} />
       ) : (
-        <XCircle className="h-4 w-4 text-red-500" />
+        <XCircle className={cn("h-4 w-4", statusIconClass("danger"))} />
       )}
       <span>{label}</span>
     </div>
@@ -79,19 +80,13 @@ export default function ComplianceAuditPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6" />
-          Compliance Audit
-          <Badge variant="secondary" className="text-xs">CHECK</Badge>
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Evaluate statutory occupational health compliance against UK regulatory
-          requirements. This CHECK-phase tool audits your current arrangements
-          and identifies areas needing attention.
-        </p>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        title="Compliance Audit"
+        icon={ShieldCheck}
+        phase="CHECK"
+        description="Evaluate statutory occupational health compliance against UK regulatory requirements. This CHECK-phase tool audits your current arrangements and identifies areas needing attention."
+      />
 
       <OrgHazardForm
         submitLabel="Run Compliance Audit"
@@ -160,20 +155,9 @@ export default function ComplianceAuditPage() {
                         <TableCell className="font-medium text-sm">{item.area}</TableCell>
                         <TableCell className="text-sm">{item.question}</TableCell>
                         <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              item.status === "compliant"
-                                ? "bg-green-100 text-green-800 border-green-300"
-                                : item.status === "partially_compliant"
-                                  ? "bg-amber-100 text-amber-800 border-amber-300"
-                                  : item.status === "non_compliant"
-                                    ? "bg-red-100 text-red-800 border-red-300"
-                                    : "bg-gray-100 text-gray-800 border-gray-300"
-                            }
-                          >
+                          <StatusBadge tone={complianceTone(item.status)}>
                             {item.status.replace(/_/g, " ")}
-                          </Badge>
+                          </StatusBadge>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm">{item.finding || "—"}</TableCell>
                         <TableCell className="hidden md:table-cell text-sm">{item.recommendation || "—"}</TableCell>

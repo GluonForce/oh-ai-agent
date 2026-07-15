@@ -33,10 +33,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Callout } from "@/components/callout";
 import { OrgHazardForm } from "@/components/org-hazard-form";
+import { PageHeader } from "@/components/page-header";
 import { SourcesCitedList } from "@/components/sources-cited";
+import { StatusBadge } from "@/components/status-badge";
 import { api } from "@/lib/api";
 import { resourcesForHazards } from "@/lib/resource-links";
+import {
+  complianceTone,
+  priorityTone,
+} from "@/lib/status-styles";
 import { downloadWorkflowJson, downloadWorkflowMarkdown } from "@/lib/workflow-export";
 import type {
   HazardCategory,
@@ -76,17 +83,14 @@ const COMPONENT_LABELS: Record<string, string> = {
 };
 
 function ratingBadge(rating: ComplianceRating) {
-  const variants: Record<ComplianceRating, { label: string; cls: string }> = {
-    compliant: { label: "Compliant", cls: "bg-green-100 text-green-800 border-green-300" },
-    partially_compliant: { label: "Partial", cls: "bg-amber-100 text-amber-800 border-amber-300" },
-    non_compliant: { label: "Non-Compliant", cls: "bg-red-100 text-red-800 border-red-300" },
-    not_assessed: { label: "Not Assessed", cls: "bg-gray-100 text-gray-800 border-gray-300" },
+  const labels: Record<ComplianceRating, string> = {
+    compliant: "Compliant",
+    partially_compliant: "Partial",
+    non_compliant: "Non-Compliant",
+    not_assessed: "Not Assessed",
   };
-  const v = variants[rating];
   return (
-    <Badge variant="outline" className={v.cls}>
-      {v.label}
-    </Badge>
+    <StatusBadge tone={complianceTone(rating)}>{labels[rating]}</StatusBadge>
   );
 }
 
@@ -128,18 +132,13 @@ export default function WorkflowsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ClipboardCheck className="h-6 w-6" />
-          PDCA Workflow Generator
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Generate hazard-specific, risk-profiled occupational health workflows
-          structured around Plan-Do-Check-Act, aligned to UK regulatory
-          requirements.
-        </p>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        title="PDCA Workflow Generator"
+        icon={ClipboardCheck}
+        phase="PLAN + DO"
+        description="Generate hazard-specific, risk-profiled occupational health workflows structured around Plan-Do-Check-Act, aligned to UK regulatory requirements."
+      />
 
       <OrgHazardForm
         submitLabel="Generate PDCA Workflow"
@@ -371,13 +370,13 @@ export default function WorkflowsPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {result.governance_prompts.map((gp, i) => (
-                      <div key={i} className="border-l-2 border-amber-500 pl-3">
+                      <Callout key={i} tone="warning">
                         <p className="text-sm">{gp.prompt_text}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Roles: {gp.applicable_roles.join(", ")} | Ref:{" "}
                           {gp.regulatory_reference}
                         </p>
-                      </div>
+                      </Callout>
                     ))}
                   </CardContent>
                 </Card>
@@ -431,7 +430,7 @@ export default function WorkflowsPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {result.trend_insights.map((ti, i) => (
-                      <div key={i} className="border-l-2 border-blue-500 pl-3 space-y-1">
+                      <Callout key={i} tone="info" className="space-y-1">
                         <p className="text-sm font-medium">{ti.area}</p>
                         <p className="text-sm">{ti.observation}</p>
                         <p className="text-xs text-muted-foreground">
@@ -442,7 +441,7 @@ export default function WorkflowsPage() {
                             Action: {ti.recommended_action}
                           </p>
                         )}
-                      </div>
+                      </Callout>
                     ))}
                   </CardContent>
                 </Card>
@@ -483,18 +482,9 @@ export default function WorkflowsPage() {
                             <TableCell className="text-sm">{ia.action}</TableCell>
                             <TableCell className="hidden lg:table-cell text-sm">{ia.rationale}</TableCell>
                             <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={
-                                  ia.priority === "high"
-                                    ? "bg-red-100 text-red-800 border-red-300"
-                                    : ia.priority === "medium"
-                                      ? "bg-amber-100 text-amber-800 border-amber-300"
-                                      : "bg-green-100 text-green-800 border-green-300"
-                                }
-                              >
+                              <StatusBadge tone={priorityTone(ia.priority)}>
                                 {ia.priority}
-                              </Badge>
+                              </StatusBadge>
                             </TableCell>
                             <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                               {ia.regulatory_reference || "—"}

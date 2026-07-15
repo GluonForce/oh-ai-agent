@@ -13,27 +13,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge } from "@/components/status-badge";
 import { api } from "@/lib/api";
+import { auditEventTone } from "@/lib/status-styles";
 import type { AuditEntry, AuditEventType } from "@/lib/types";
 import { toast } from "sonner";
 
 function eventBadge(event: AuditEventType) {
-  const colors: Record<string, string> = {
-    workflow_requested: "bg-blue-100 text-blue-800 border-blue-300",
-    workflow_generated: "bg-green-100 text-green-800 border-green-300",
-    benchmark_requested: "bg-blue-100 text-blue-800 border-blue-300",
-    benchmark_generated: "bg-green-100 text-green-800 border-green-300",
-    gap_analysis_requested: "bg-blue-100 text-blue-800 border-blue-300",
-    gap_analysis_generated: "bg-green-100 text-green-800 border-green-300",
-    knowledge_retrieved: "bg-purple-100 text-purple-800 border-purple-300",
-    document_ingested: "bg-purple-100 text-purple-800 border-purple-300",
-    guardrail_triggered: "bg-amber-100 text-amber-800 border-amber-300",
-    error: "bg-red-100 text-red-800 border-red-300",
-  };
   return (
-    <Badge variant="outline" className={colors[event] ?? ""}>
+    <StatusBadge tone={auditEventTone(event)}>
       {event.replace(/_/g, " ")}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -54,26 +51,22 @@ export default function AuditPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ScrollText className="h-6 w-6" />
-            Audit Trail
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Immutable log of all agent actions for regulatory traceability.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="secondary" className="text-sm">
-            {total} total entries
-          </Badge>
-          <Button size="sm" variant="outline" onClick={load}>
-            <RefreshCw className="mr-1 h-3 w-3" />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Audit Trail"
+        icon={ScrollText}
+        description="Immutable log of all agent actions for regulatory traceability."
+        actions={
+          <>
+            <Badge variant="secondary" className="font-mono text-sm tabular-nums">
+              {total} total entries
+            </Badge>
+            <Button size="sm" variant="outline" onClick={load}>
+              <RefreshCw className="mr-1 h-3 w-3" />
+              Refresh
+            </Button>
+          </>
+        }
+      />
 
       <Card>
         <CardContent className="p-0">
@@ -83,46 +76,55 @@ export default function AuditPage() {
               create entries.
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>Event</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Request ID
-                  </TableHead>
-                  <TableHead>Actor</TableHead>
-                  <TableHead className="hidden lg:table-cell">
-                    Detail
-                  </TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Model
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {entries.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(entry.timestamp).toLocaleString()}
-                    </TableCell>
-                    <TableCell>{eventBadge(entry.event_type)}</TableCell>
-                    <TableCell className="hidden md:table-cell text-xs font-mono text-muted-foreground">
-                      {entry.request_id
-                        ? entry.request_id.slice(0, 8) + "…"
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-sm">{entry.actor}</TableCell>
-                    <TableCell className="hidden lg:table-cell text-xs text-muted-foreground max-w-64 truncate">
-                      {JSON.stringify(entry.detail)}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-xs">
-                      {entry.model_used ?? "—"}
-                    </TableCell>
+            <TooltipProvider>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>Event</TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      Request ID
+                    </TableHead>
+                    <TableHead>Actor</TableHead>
+                    <TableHead className="hidden lg:table-cell">Detail</TableHead>
+                    <TableHead className="hidden md:table-cell">Model</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {entries.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground tabular-nums">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </TableCell>
+                      <TableCell>{eventBadge(entry.event_type)}</TableCell>
+                      <TableCell className="hidden font-mono text-xs text-muted-foreground md:table-cell">
+                        {entry.request_id ? (
+                          <Tooltip>
+                            <TooltipTrigger className="cursor-default underline decoration-dotted underline-offset-2">
+                              {entry.request_id.slice(0, 8)}…
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <span className="font-mono text-xs">
+                                {entry.request_id}
+                              </span>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">{entry.actor}</TableCell>
+                      <TableCell className="hidden max-w-64 truncate text-xs text-muted-foreground lg:table-cell">
+                        {JSON.stringify(entry.detail)}
+                      </TableCell>
+                      <TableCell className="hidden font-mono text-xs md:table-cell">
+                        {entry.model_used ?? "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TooltipProvider>
           )}
         </CardContent>
       </Card>

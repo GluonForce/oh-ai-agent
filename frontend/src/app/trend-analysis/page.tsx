@@ -16,7 +16,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Callout } from "@/components/callout";
 import { OrgHazardForm } from "@/components/org-hazard-form";
+import { PageHeader } from "@/components/page-header";
 import { SourcesCitedList } from "@/components/sources-cited";
 import { api } from "@/lib/api";
 import type {
@@ -61,19 +63,13 @@ export default function TrendAnalysisPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <TrendingUp className="h-6 w-6" />
-          Trend Analysis
-          <Badge variant="secondary" className="text-xs">REVIEW</Badge>
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Analyse anonymised surveillance data to identify trends, evaluate
-          control effectiveness, and highlight emerging risks across your
-          occupational health programme.
-        </p>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        title="Trend Analysis"
+        icon={TrendingUp}
+        phase="REVIEW"
+        description="Analyse anonymised surveillance data to identify trends, evaluate control effectiveness, and highlight emerging risks across your occupational health programme."
+      />
 
       <Card>
         <CardHeader>
@@ -167,14 +163,12 @@ export default function TrendAnalysisPage() {
               <CardHeader>
                 <CardTitle className="text-base">Control Effectiveness Indicators</CardTitle>
               </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {result.control_effectiveness_indicators.map((ind, i) => (
-                    <li key={i} className="text-sm text-muted-foreground border-l-2 border-blue-500 pl-3">
-                      {ind}
-                    </li>
+              <CardContent className="space-y-2">
+                {result.control_effectiveness_indicators.map((ind, i) => (
+                    <Callout key={i} tone="info">
+                      <p className="text-sm text-muted-foreground">{ind}</p>
+                    </Callout>
                   ))}
-                </ul>
               </CardContent>
             </Card>
           )}

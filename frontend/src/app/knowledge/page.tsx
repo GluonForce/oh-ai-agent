@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/page-header";
 import { api } from "@/lib/api";
 import type { KnowledgeSource, KnowledgeStats } from "@/lib/types";
 import { toast } from "sonner";
@@ -73,49 +74,12 @@ export default function KnowledgePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <BookOpen className="h-6 w-6" />
-          Knowledge Base
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Authoritative sources and document management for the RAG pipeline.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">
-              Registered Sources
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <span className="text-2xl font-bold">
-              {stats?.sources_registered ?? "—"}
-            </span>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground flex items-center gap-1">
-              <Database className="h-3 w-3" />
-              Indexed Chunks
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <span className="text-2xl font-bold">
-              {stats?.total_chunks ?? "—"}
-            </span>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">
-              Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex gap-2 flex-wrap">
+      <PageHeader
+        title="Knowledge Base"
+        icon={BookOpen}
+        description="Authoritative sources and document management for the RAG pipeline."
+        actions={
+          <>
             <Button
               size="sm"
               variant="outline"
@@ -149,6 +113,34 @@ export default function KnowledgePage() {
               className="hidden"
               onChange={handleUpload}
             />
+          </>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">
+              Registered sources
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <span className="font-heading text-2xl font-semibold tabular-nums tracking-tight">
+              {stats?.sources_registered ?? "—"}
+            </span>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Database className="h-3 w-3" />
+              Indexed chunks
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <span className="font-heading text-2xl font-semibold tabular-nums tracking-tight">
+              {stats?.total_chunks ?? "—"}
+            </span>
           </CardContent>
         </Card>
       </div>
