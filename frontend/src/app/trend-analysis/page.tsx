@@ -76,7 +76,9 @@ export default function TrendAnalysisPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Surveillance Summary *</CardTitle>
+          <CardTitle className="text-base">
+            4. Record your findings — surveillance summary *
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">

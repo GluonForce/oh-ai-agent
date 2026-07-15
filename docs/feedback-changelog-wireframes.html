@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Feedback UX — Changelog &amp; Wireframes</title>
+  <style>
+    @page { size: A4; margin: 16mm 14mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.4;
+      color: #1a1a1a;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 18pt; margin: 0 0 6px; }
+    h2 { font-size: 13pt; margin: 22px 0 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+    h3 { font-size: 11pt; margin: 14px 0 6px; }
+    p, li { margin: 4px 0; }
+    .meta { color: #555; font-size: 9.5pt; margin-bottom: 14px; }
+    .callout {
+      border: 1px solid #bbb;
+      background: #f6f6f6;
+      padding: 8px 10px;
+      margin: 10px 0 16px;
+      border-radius: 4px;
+    }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 9.5pt; }
+    th, td { border: 1px solid #ccc; padding: 5px 7px; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .wire {
+      border: 1px solid #999;
+      border-radius: 6px;
+      margin: 10px 0 18px;
+      page-break-inside: avoid;
+    }
+    .wire-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid #ccc;
+      background: #f0f0f0;
+      font-weight: 600;
+      font-size: 10pt;
+    }
+    .wire-body { padding: 10px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+    .field label {
+      display: block;
+      font-size: 8.5pt;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+    .field .box {
+      border: 1px solid #bbb;
+      background: #fafafa;
+      padding: 6px 8px;
+      min-height: 28px;
+      border-radius: 3px;
+      font-size: 9.5pt;
+    }
+    .hint { font-size: 8pt; color: #666; margin-top: 2px; }
+    .check { margin: 3px 0; font-size: 9.5pt; }
+    .check::before { content: "☐ "; }
+    .pills { display: flex; flex-wrap: wrap; gap: 4px; }
+    .pill {
+      border: 1px solid #999;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 8pt;
+      background: #fff;
+      white-space: nowrap;
+    }
+    .indicators { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+    .ind { font-size: 9.5pt; }
+    .ind .badge {
+      display: inline-block;
+      border: 1px solid #888;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 8pt;
+      margin-right: 4px;
+    }
+    .alert {
+      border: 1px solid #aaa;
+      background: #f5f5f5;
+      padding: 8px 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    .alert strong { display: block; margin-bottom: 2px; }
+    ul { padding-left: 18px; margin: 4px 0 8px; }
+    .section { margin-bottom: 8px; }
+    @media print {
+      body { max-width: none; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Feedback UX — Changelog &amp; Wireframes</h1>
+  <p class="meta">
+    Source: feedback/feedback.docx · Date: 2026-07-13 ·
+    Also: docs/CHANGELOG-feedback.md · Canvas: feedback-changelog-wireframes
+  </p>
+
+  <div class="callout">
+    <strong>Scope.</strong> In-scope feedback shipped as T1–T5.
+    Blue-sky media uploads and server-side history remain out of scope.
+  </div>
+
+  <h2>Changelog summary</h2>
+  <table>
+    <thead>
+      <tr><th>Area</th><th>Change</th><th>Task</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Form catalogs</td>
+        <td>Sector/tasks/workforce multi-selects; exposure definitions; WEL/effects suggest</td>
+        <td>T1</td>
+      </tr>
+      <tr>
+        <td>Models / PLAN</td>
+        <td>DeliveryModel.none; optional hazard phrase; de-dupe PLAN confirmations</td>
+        <td>T2</td>
+      </tr>
+      <tr>
+        <td>PDCA prompts</td>
+        <td>Role/terminology consistency; Surveillance vs Workflow Steps copy</td>
+        <td>T3</td>
+      </tr>
+      <tr>
+        <td>CHECK / REVIEW</td>
+        <td>Methodology + escalation indicators; PII / small-cell alert</td>
+        <td>T4</td>
+      </tr>
+      <tr>
+        <td>Persistence</td>
+        <td>sessionStorage live draft; localStorage named drafts Save/Load</td>
+        <td>T5</td>
+      </tr>
+      <tr>
+        <td>Build fix</td>
+        <td>Select onValueChange typed as string | null for Load draft</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Added / Changed / Fixed (detail)</h2>
+  <h3>Added</h3>
+  <div class="section">
+    <strong>Form (T1)</strong>
+    <ul>
+      <li>Static option catalogs (sector, tasks, workforce, hazard phrases, health effects, controls).</li>
+      <li>Exposure level/frequency definition helper text; overrideable WEL and health-effect suggestions.</li>
+    </ul>
+    <strong>Persistence (T5)</strong>
+    <ul>
+      <li>Live draft (sessionStorage) across pages; named drafts (localStorage) Save / Load / Clear.</li>
+    </ul>
+    <strong>CHECK / REVIEW (T4)</strong>
+    <ul>
+      <li><code>methodology_assessed</code> and <code>escalation_process_assessed</code>; Trend PII / triangulation alert.</li>
+    </ul>
+    <strong>Prompts (T3) / Models (T2)</strong>
+    <ul>
+      <li><code>WORKFLOW_CONSISTENCY_RULES</code>, strengthened guardrails; <code>DeliveryModel.none</code>.</li>
+    </ul>
+  </div>
+  <h3>Changed</h3>
+  <ul>
+    <li>Sector &amp; tasks dropdowns/multi-selects; “Number of workers exposed”; “Model of OH Delivery”.</li>
+    <li>Hazard phrase optional (phrase or substance/agent required); PLAN confirmations de-duplicated when risk-assessment block shown.</li>
+  </ul>
+  <h3>Fixed</h3>
+  <ul>
+    <li>Draft Load Select typing so Next.js <code>npm run build</code> succeeds.</li>
+  </ul>
+
+  <h2>Wireframe 1 — Organisation &amp; drafts</h2>
+  <p class="meta">After feedback · Shared OrgHazardForm (Workflows / Compliance / Trend / Improvement)</p>
+  <div class="wire">
+    <div class="wire-header">
+      <span>PLAN — Organisation &amp; Risk Profile</span>
+      <div class="pills">
+        <span class="pill">Draft name</span>
+        <span class="pill">Save draft</span>
+        <span class="pill">Load draft</span>
+      </div>
+    </div>
+    <div class="wire-body">
+      <div class="grid2">
+        <div class="field">
+          <label>Organisation Name *</label>
+          <div class="box">Acme Manufacturing Ltd</div>
+        </div>
+        <div class="field">
+          <label>Sector *</label>
+          <div class="box">Manufacturing</div>
+          <div class="hint">Dropdown + Other (was free text)</div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>Key Tasks (select all that apply)</label>
+        <div class="box">
+          <div class="check">Metal grinding</div>
+          <div class="check">Spray painting</div>
+          <div class="check">Welding</div>
+        </div>
+        <div class="hint">Sector-aware checklist + Other</div>
+      </div>
+      <div class="grid3" style="margin-top:10px">
+        <div class="field">
+          <label>Number of workers exposed</label>
+          <div class="box">250</div>
+          <div class="hint">Was: Workforce Size</div>
+        </div>
+        <div class="field">
+          <label>Model of OH Delivery</label>
+          <div class="box">OHN-led</div>
+          <div class="hint">Includes: No OH service currently in place</div>
+        </div>
+        <div class="field">
+          <label>Number of Sites</label>
+          <div class="box">1</div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>Workforce Characteristics (select all that apply)</label>
+        <div class="box">
+          <div class="check">Shift / night workers</div>
+          <div class="check">Temporary / agency workers</div>
+        </div>
+        <div class="hint">Multi-select + Other (was free text)</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Wireframe 2 — Hazard profile</h2>
+  <div class="wire">
+    <div class="wire-header">Hazard Profiles *</div>
+    <div class="wire-body">
+      <strong style="font-size:9.5pt">Hazard 1</strong>
+      <div class="grid4" style="margin-top:8px">
+        <div class="field"><label>Category</label><div class="box">Chemical</div></div>
+        <div class="field">
+          <label>Exposure Level</label>
+          <div class="box">High</div>
+          <div class="hint">At or above action values / WEL…</div>
+        </div>
+        <div class="field">
+          <label>Frequency</label>
+          <div class="box">Frequent</div>
+          <div class="hint">Several times per week</div>
+        </div>
+        <div class="field"><label>Duration</label><div class="box">Medium (1–4hrs)</div></div>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>Hazard Phrase (optional — select all that apply)</label>
+        <div class="box"><div class="check">H334 — May cause allergy or asthma…</div></div>
+        <div class="hint">No longer mandatory; substance/agent may stand alone</div>
+      </div>
+      <div class="grid2" style="margin-top:10px">
+        <div class="field"><label>Substance / Agent</label><div class="box">isocyanates</div></div>
+        <div class="field">
+          <label>Workplace Exposure Limit</label>
+          <div class="box">20 µg/m³ NCO (8-hr TWA)</div>
+          <div class="hint">Auto-fills from agent when known — override freely</div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>Potential Health Effects</label>
+        <div class="box"><div class="check">Occupational asthma / respiratory sensitisation</div></div>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>Existing Control Measures</label>
+        <div class="box">
+          <div class="check">Local exhaust ventilation (LEV)</div>
+          <div class="check">Respiratory protective equipment (RPE)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Wireframe 3 — Compliance Assessment Indicators</h2>
+  <p class="meta">CHECK page — two new indicator booleans from feedback</p>
+  <div class="wire">
+    <div class="wire-header">Assessment Indicators</div>
+    <div class="wire-body">
+      <div class="indicators">
+        <span class="ind"><span class="badge">Yes</span> Employee Coverage Assessed</span>
+        <span class="ind"><span class="badge">Yes</span> Interval Adherence Assessed</span>
+        <span class="ind"><span class="badge">No</span> Governance Assessed</span>
+        <span class="ind"><span class="badge">Yes</span> Methodology Appropriate</span>
+        <span class="ind"><span class="badge">No</span> Escalation Process Assessed</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Wireframe 4 — Trend Analysis PII warning</h2>
+  <div class="wire">
+    <div class="wire-header">Surveillance Summary *</div>
+    <div class="wire-body">
+      <div class="alert">
+        <strong>Use anonymised data only</strong>
+        Do not include identifiable or personal data. Avoid small groups whose
+        combined details could enable triangulation of an individual.
+      </div>
+      <div class="field">
+        <label>Provide a summary of your surveillance data for analysis</label>
+        <div class="box">Over the last 12 months, 15 audiometry tests were conducted…</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Cross-page persistence</h2>
+  <p>
+    Live draft → sessionStorage (auto). Named drafts → localStorage (Save/Load).
+    Same shared form hydrates Workflows, Compliance Audit, Trend Analysis, and Improvement Plan.
+  </p>
+</body>
+</html>

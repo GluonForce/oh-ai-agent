@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, Trash2, Loader2, Save } from "lucide-react";
+import { Plus, Trash2, Loader2, Save, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import type {
+  AssessmentScope,
   DeliveryModel,
   ExposureDuration,
   ExposureFrequency,
@@ -25,22 +27,28 @@ import type {
   HazardProfile,
   OrganisationProfile,
   RiskAssessmentConfirmation,
+  SurveillanceLevel,
 } from "@/lib/types";
 import {
   CONTROL_MEASURE_OPTIONS,
   HAZARD_PHRASE_OPTIONS,
   HEALTH_EFFECT_OPTIONS,
+  PRE_EXISTING_CONDITION_OPTIONS,
   SECTOR_OPTIONS,
+  WET_WORK_HIGH_RISK_HAND_WASHES,
   WORKFORCE_CHARACTERISTIC_OPTIONS,
   exposureFrequencyDefinition,
   exposureLevelDefinition,
+  isWetWorkHazard,
   joinSelections,
   splitSelections,
   suggestHealthEffects,
+  suggestSurveillanceLevel,
   suggestWel,
   tasksForSector,
 } from "@/lib/form-options";
 import {
+  clearLiveDraft,
   deleteNamedDraft,
   listNamedDrafts,
   loadLiveDraft,
@@ -116,6 +124,8 @@ function defaultOrg(): OrganisationProfile {
     tasks: [],
     workforce_size: undefined,
     workforce_characteristics: "",
+    assessment_scope: "staff_group",
+    pre_existing_conditions: [],
     multi_site: false,
     site_count: 1,
     delivery_model: "mixed",
@@ -192,6 +202,8 @@ type FormUiState = {
   tasksOther: string;
   workforceSelected: string[];
   workforceOther: string;
+  conditionsSelected: string[];
+  conditionsOther: string;
   hazards: HazardProfile[];
   phraseSelected: string[][];
   phraseOther: string[];
@@ -212,6 +224,8 @@ function emptyUiState(): FormUiState {
     tasksOther: "",
     workforceSelected: [],
     workforceOther: "",
+    conditionsSelected: [],
+    conditionsOther: "",
     hazards: [emptyHazard()],
     phraseSelected: [[]],
     phraseOther: [""],
@@ -251,6 +265,10 @@ function uiStateFromPayload(
   const knownTasks = new Set(tasksForSector(matchedSector?.value ?? "other"));
   const hz = nextHazards.length ? nextHazards : [emptyHazard()];
   const wf = splitSelections(nextOrg.workforce_characteristics, WORKFORCE_CHARACTERISTIC_OPTIONS);
+  const cond = splitSelections(
+    (nextOrg.pre_existing_conditions ?? []).join("; "),
+    PRE_EXISTING_CONDITION_OPTIONS
+  );
   return {
     org: nextOrg,
     sectorKey,
@@ -259,6 +277,8 @@ function uiStateFromPayload(
     tasksOther: taskParts.filter((t) => !knownTasks.has(t)).join("; "),
     workforceSelected: wf.selected,
     workforceOther: wf.other,
+    conditionsSelected: cond.selected,
+    conditionsOther: cond.other,
     hazards: hz,
     phraseSelected: hz.map((h) => splitSelections(h.hazard_phrase, HAZARD_PHRASE_OPTIONS).selected),
     phraseOther: hz.map((h) => splitSelections(h.hazard_phrase, HAZARD_PHRASE_OPTIONS).other),
@@ -308,6 +328,8 @@ export function OrgHazardForm({
     tasksOther,
     workforceSelected,
     workforceOther,
+    conditionsSelected,
+    conditionsOther,
     hazards,
     phraseSelected,
     phraseOther,
@@ -327,6 +349,9 @@ export function OrgHazardForm({
   const setWorkforceSelected = (workforceSelected: string[]) =>
     setUi((s) => ({ ...s, workforceSelected }));
   const setWorkforceOther = (workforceOther: string) => setUi((s) => ({ ...s, workforceOther }));
+  const setConditionsSelected = (conditionsSelected: string[]) =>
+    setUi((s) => ({ ...s, conditionsSelected }));
+  const setConditionsOther = (conditionsOther: string) => setUi((s) => ({ ...s, conditionsOther }));
   const setHazards = (next: HazardProfile[] | ((prev: HazardProfile[]) => HazardProfile[])) =>
     setUi((s) => ({ ...s, hazards: typeof next === "function" ? next(s.hazards) : next }));
   const setPhraseSelected = (next: string[][] | ((prev: string[][]) => string[][])) =>
@@ -392,6 +417,10 @@ export function OrgHazardForm({
           sector: resolveSector(),
           tasks: tasksText.split(";").map((x) => x.trim()).filter(Boolean),
           workforce_characteristics: joinSelections(workforceSelected, workforceOther),
+          pre_existing_conditions: joinSelections(conditionsSelected, conditionsOther)
+            .split(";")
+            .map((x) => x.trim())
+            .filter(Boolean),
         },
         hazards: hazards.map((h, i) => enrichHazard(h, i)),
         tasksText,
@@ -484,11 +513,18 @@ export function OrgHazardForm({
       .split(";")
       .map((t) => t.trim())
       .filter(Boolean);
+    const conditions = joinSelections(conditionsSelected, conditionsOther)
+      .split(";")
+      .map((t) => t.trim())
+      .filter(Boolean);
     const finalOrg: OrganisationProfile = {
       ...org,
+      name: org.name.trim() || "Anonymous organisation",
       sector,
       tasks,
       workforce_characteristics: joinSelections(workforceSelected, workforceOther) || undefined,
+      pre_existing_conditions: conditions,
+      assessment_scope: org.assessment_scope ?? "staff_group",
     };
     if (showRiskAssessment) {
       finalOrg.risk_assessment_confirmed = riskAssessment.risk_assessment_completed;
@@ -501,13 +537,20 @@ export function OrgHazardForm({
           (h.hazard_phrase && h.hazard_phrase.trim()) ||
           (h.substance_or_agent && h.substance_or_agent.trim())
       );
-    if (!finalOrg.name || !finalOrg.sector || cleanedHazards.length === 0) return;
+    if (!finalOrg.sector || cleanedHazards.length === 0) return;
     onSubmit(
       finalOrg,
       cleanedHazards,
       additionalContext || undefined,
       showRiskAssessment ? riskAssessment : undefined
     );
+  };
+
+  const handleClearForm = () => {
+    clearLiveDraft();
+    setUi(emptyUiState());
+    setDraftName("");
+    toast.success("Form cleared — ready for a new workflow");
   };
 
   const handleSaveNamed = () => {
@@ -518,6 +561,10 @@ export function OrgHazardForm({
         sector: resolveSector(),
         tasks: tasksText.split(";").map((x) => x.trim()).filter(Boolean),
         workforce_characteristics: joinSelections(workforceSelected, workforceOther),
+        pre_existing_conditions: joinSelections(conditionsSelected, conditionsOther)
+          .split(";")
+          .map((x) => x.trim())
+          .filter(Boolean),
       },
       hazards: hazards.map((h, i) => enrichHazard(h, i)),
       tasksText,
@@ -557,6 +604,9 @@ export function OrgHazardForm({
             <Button type="button" variant="outline" size="sm" onClick={handleSaveNamed}>
               <Save className="mr-1 h-3.5 w-3.5" /> Save draft
             </Button>
+            <Button type="button" variant="outline" size="sm" onClick={handleClearForm}>
+              <RotateCcw className="mr-1 h-3.5 w-3.5" /> Clear form
+            </Button>
             {namedDrafts.length > 0 && (
               <Select
                 onValueChange={(id: string | null) => {
@@ -593,14 +643,16 @@ export function OrgHazardForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="org-name">Organisation Name *</Label>
+              <Label htmlFor="org-name">Organisation Name (optional)</Label>
               <Input
                 id="org-name"
                 value={org.name}
                 onChange={(e) => setOrg({ ...org, name: e.target.value })}
-                placeholder="e.g. Acme Manufacturing Ltd"
-                required
+                placeholder="Leave blank for anonymous use"
               />
+              <p className="text-xs text-muted-foreground">
+                You can run workflows without naming the organisation.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Sector *</Label>
@@ -636,6 +688,32 @@ export function OrgHazardForm({
                 />
               )}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Assessment scope</Label>
+            <Select
+              value={org.assessment_scope ?? "staff_group"}
+              onValueChange={(v) =>
+                v &&
+                setOrg({
+                  ...org,
+                  assessment_scope: v as AssessmentScope,
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="staff_group">Staff group / population</SelectItem>
+                <SelectItem value="individual">Individual worker</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Individual scope surfaces pre-existing conditions that raise risk for a specific
+              worker.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -715,7 +793,7 @@ export function OrgHazardForm({
           </div>
 
           <div className="space-y-2">
-            <Label>Workforce Characteristics (select all that apply)</Label>
+            <Label>2. Assess the risks — workforce characteristics</Label>
             <MultiCheck
               idPrefix="wf"
               options={WORKFORCE_CHARACTERISTIC_OPTIONS}
@@ -730,12 +808,33 @@ export function OrgHazardForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="existing-surv">Existing Surveillance</Label>
+            <Label>
+              Pre-existing conditions that may increase individual risk
+              {org.assessment_scope === "individual" ? " *" : ""}
+            </Label>
+            <MultiCheck
+              idPrefix="cond"
+              options={PRE_EXISTING_CONDITION_OPTIONS}
+              selected={conditionsSelected}
+              onChange={setConditionsSelected}
+            />
+            <Input
+              value={conditionsOther}
+              onChange={(e) => setConditionsOther(e.target.value)}
+              placeholder="Other conditions (e.g. known eczema for skin hazard)"
+            />
+            <p className="text-xs text-muted-foreground">
+              e.g. asthma/COPD for respiratory hazards; eczema for skin hazards.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="existing-surv">4. Record your findings — existing surveillance</Label>
             <Textarea
               id="existing-surv"
               value={org.existing_surveillance ?? ""}
               onChange={(e) => setOrg({ ...org, existing_surveillance: e.target.value })}
-              placeholder="Describe current health surveillance arrangements"
+              placeholder="Describe current health surveillance arrangements / results summary"
               rows={2}
             />
           </div>
@@ -744,7 +843,7 @@ export function OrgHazardForm({
             <>
               <Separator />
               <div className="space-y-3">
-                <p className="text-sm font-medium">PLAN Confirmations</p>
+                <p className="text-sm font-medium">5. Review the controls — PLAN confirmations</p>
                 <div className="flex items-center gap-2">
                   <Checkbox
                     id="risk-assessment"
@@ -779,7 +878,9 @@ export function OrgHazardForm({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Hazard Profiles *</CardTitle>
+          <CardTitle className="text-base">
+            Hazard Profiles * — HSE steps 1–3
+          </CardTitle>
           <Button type="button" variant="outline" size="sm" onClick={addHazard}>
             <Plus className="mr-1 h-4 w-4" /> Add Hazard
           </Button>
@@ -906,7 +1007,7 @@ export function OrgHazardForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label>Hazard Phrase (optional — select all that apply)</Label>
+                  <Label>1. Identify the hazards — hazard phrase (optional)</Label>
                   <MultiCheck
                     idPrefix={`hp-${idx}`}
                     options={HAZARD_PHRASE_OPTIONS}
@@ -940,7 +1041,7 @@ export function OrgHazardForm({
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label>Workplace Exposure Limit</Label>
+                    <Label>2. Assess the risks — Workplace Exposure Limit</Label>
                     <Input
                       value={hazard.workplace_exposure_limit ?? ""}
                       onChange={(e) =>
@@ -952,6 +1053,73 @@ export function OrgHazardForm({
                     />
                   </div>
                 </div>
+
+                {isWetWorkHazard(
+                  hazard.category,
+                  joinSelections(phraseSelected[idx] ?? [], phraseOther[idx] ?? ""),
+                  hazard.substance_or_agent
+                ) && (
+                  <div className="space-y-2 rounded-md border p-3">
+                    <Label htmlFor={`hand-washes-${idx}`}>
+                      Hand washes per day (wet work)
+                    </Label>
+                    <Input
+                      id={`hand-washes-${idx}`}
+                      type="number"
+                      min={0}
+                      value={hazard.hand_washes_per_day ?? ""}
+                      onChange={(e) => {
+                        const washes = e.target.value ? Number(e.target.value) : undefined;
+                        const level = suggestSurveillanceLevel(washes ?? null);
+                        const patch: Partial<HazardProfile> = {
+                          hand_washes_per_day: washes,
+                          surveillance_level: level,
+                        };
+                        if (
+                          washes != null &&
+                          washes > WET_WORK_HIGH_RISK_HAND_WASHES
+                        ) {
+                          patch.exposure_level = "high";
+                        }
+                        updateHazard(idx, patch);
+                      }}
+                      placeholder="e.g. 25"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      HSE: more than {WET_WORK_HIGH_RISK_HAND_WASHES} hand washes/day is high
+                      risk and needs higher-level health surveillance. See{" "}
+                      <a
+                        className="underline"
+                        href="https://www.hse.gov.uk/health-surveillance/"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        HSE health surveillance
+                      </a>
+                      .
+                    </p>
+                    <div className="space-y-1">
+                      <Label>Surveillance level</Label>
+                      <Select
+                        value={hazard.surveillance_level}
+                        onValueChange={(v) =>
+                          v &&
+                          updateHazard(idx, {
+                            surveillance_level: v as SurveillanceLevel,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="lower">Lower-level health surveillance</SelectItem>
+                          <SelectItem value="higher">Higher-level health surveillance</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <Label>Potential Health Effects (select all that apply)</Label>
@@ -977,7 +1145,7 @@ export function OrgHazardForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label>Existing Control Measures (select all that apply)</Label>
+                  <Label>3. Control the risks (hierarchy of controls)</Label>
                   <MultiCheck
                     idPrefix={`cm-${idx}`}
                     options={CONTROL_MEASURE_OPTIONS}
@@ -997,6 +1165,10 @@ export function OrgHazardForm({
                     }
                     placeholder="Other controls"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Options follow elimination → substitution → engineering → administrative →
+                    PPE. Health surveillance is administrative; PPE is last line of defence.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1023,7 +1195,7 @@ export function OrgHazardForm({
       {showRiskAssessment && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Risk Assessment Confirmation</CardTitle>
+            <CardTitle className="text-base">5. Review the controls — risk assessment confirmation</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2">

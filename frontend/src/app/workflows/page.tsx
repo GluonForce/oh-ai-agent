@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Download,
+  ExternalLink,
   FileText,
   ListChecks,
   ShieldAlert,
@@ -34,8 +35,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { OrgHazardForm } from "@/components/org-hazard-form";
 import { api } from "@/lib/api";
+import { resourcesForHazards } from "@/lib/resource-links";
 import { downloadWorkflowJson, downloadWorkflowMarkdown } from "@/lib/workflow-export";
 import type {
+  HazardCategory,
   HazardProfile,
   OrganisationProfile,
   RiskAssessmentConfirmation,
@@ -90,6 +93,7 @@ export default function WorkflowsPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<WorkflowResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastHazards, setLastHazards] = useState<HazardProfile[]>([]);
 
   const handleSubmit = async (
     org: OrganisationProfile,
@@ -100,6 +104,7 @@ export default function WorkflowsPage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setLastHazards(hazards);
     try {
       const res = await api.generateWorkflow({
         organisation: org,
@@ -501,23 +506,54 @@ export default function WorkflowsPage() {
             </TabsContent>
           </Tabs>
 
-          {result.sources_cited.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Sources Cited
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {result.sources_cited.map((s, i) => (
-                    <Badge key={i} variant="secondary">{s}</Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {(() => {
+            const categories = lastHazards.map((h) => h.category as HazardCategory);
+            const resources = resourcesForHazards(categories, result.sources_cited);
+            if (resources.length === 0) return null;
+            return (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Resources for human review
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Cross-check generated outputs against these authoritative sources (HSE, SEQOHS,
+                    training guidance).
+                  </p>
+                  <ul className="space-y-2">
+                    {resources.map((r) => (
+                      <li key={r.url} className="text-sm">
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium underline underline-offset-2"
+                        >
+                          {r.title}
+                        </a>
+                        <span className="text-muted-foreground"> — {r.description}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {result.sources_cited.length > 0 && (
+                    <div className="pt-2">
+                      <p className="text-sm font-medium mb-2">Model sources cited</p>
+                      <div className="flex flex-wrap gap-2">
+                        {result.sources_cited.map((s, i) => (
+                          <Badge key={i} variant="secondary">
+                            {s}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
         </div>
       )}
     </div>

@@ -166,6 +166,23 @@ OH_LLM_MODEL=openai/gpt-4o-mini
 
 You can open `.env` in Notepad to verify it is not empty, but **do not change it** unless you are told to.
 
+### Optional: PII masking
+
+Free-text fields sent to the LLM are masked by default with regex heuristics using OpenAI Privacy Filter placeholders (`[PRIVATE_EMAIL]`, `[PRIVATE_PERSON]`, etc.). To enable the local OpenAI Privacy Filter model (heavy: torch + ~3GB weights):
+
+```powershell
+git clone https://github.com/openai/privacy-filter.git
+cd privacy-filter
+uv pip install -e .
+```
+
+Then set in `.env`:
+
+```env
+OH_PII_PROVIDER=opf
+OH_PII_DEVICE=cpu
+```
+
 ### Keep the key private
 
 The `.env` file contains a live API key paid for by the project provider.

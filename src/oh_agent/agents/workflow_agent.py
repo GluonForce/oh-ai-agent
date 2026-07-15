@@ -52,6 +52,38 @@ WORKFLOW_CONSISTENCY_RULES = """\
 - Keep the sections distinct: surveillance_provisions define statutory checks and
   competence requirements; workflow_steps define the operational sequence that
   delivers them.
+
+## Hierarchy of controls (MUST)
+- Align every control recommendation and workflow action to the hierarchy of controls:
+  elimination → substitution → engineering → administrative → PPE.
+- PPE is the last line of defence. Health surveillance is an administrative control,
+  not a substitute for higher-order controls.
+- For high-risk chemicals (e.g. COSHH SDS with high hazard), recommend discussing
+  elimination/substitution with the employer's health and safety representative
+  before relying on PPE or surveillance alone.
+
+## Wet work / skin (MUST)
+- Skin exposure / wet work with greater than 20 hand washes per day is high risk and
+  requires higher-level health surveillance (distinguish from lower-level surveillance).
+- Reflect surveillance_level from the hazard profile when provided.
+
+## SEQOHS (where appropriate)
+- Reference SEQOHS domains in PLAN/surveillance and training context, e.g.
+  SEQOHS domain 3.2 (health surveillance) and domain 5.2 (staff training for surveillance).
+
+## Referral boundaries (ACT / referral pathways)
+- Give clear referral boundaries for human-in-the-loop review. Example: established
+  unilateral hearing loss on audiometry → refer to OHP / ENT pathway as clinically indicated;
+  do not leave as routine recall only.
+
+## Sources and training links (MUST)
+- Prefer concrete URL-bearing entries in sources_cited so humans can cross-check, e.g.:
+  https://www.hse.gov.uk/simple-health-safety/risk/steps-needed-to-manage-risk.htm
+  https://www.hse.gov.uk/health-surveillance/
+  https://www.hse.gov.uk/ppe/
+  https://www.seqohs.org/
+  Respiratory training: https://www.artp.org.uk/Training-and-Development
+  Audiology: https://www.thebsa.org.uk/
 """
 
 _WORKFLOW_USER_TEMPLATE = """\
@@ -65,7 +97,9 @@ workflow for the following organisation and hazard profile.
 - Workforce size: {workforce_size}
 - Multi-site: {multi_site} ({site_count} site(s))
 - Delivery model: {delivery_model}
+- Assessment scope: {assessment_scope}
 - Workforce characteristics: {workforce_chars}
+- Pre-existing conditions (individual risk): {pre_existing_conditions}
 - Existing surveillance: {existing_surveillance}
 - Risk assessment confirmed: {risk_assessment_confirmed}
 - Workers consulted: {workers_consulted}
@@ -139,7 +173,7 @@ review_appointment|record_keeping",
     "regulatory_reference": "..."
   }}],
   "governance_prompts": [{{"prompt_text": "...", "applicable_roles": [...], "regulatory_reference": "..."}}],
-  "sources_cited": [...]
+  "sources_cited": ["Title — https://example.org/..."]
 }}"""
 
 
@@ -159,6 +193,10 @@ def _build_hazards_block(request: WorkflowRequest) -> str:
             lines.append(f"   Potential health effects: {h.potential_health_effects}")
         if h.existing_controls:
             lines.append(f"   Existing controls: {h.existing_controls}")
+        if h.hand_washes_per_day is not None:
+            lines.append(f"   Hand washes per day: {h.hand_washes_per_day}")
+        if h.surveillance_level is not None:
+            lines.append(f"   Surveillance level: {h.surveillance_level.value}")
     return "\n".join(lines)
 
 
@@ -244,7 +282,11 @@ class WorkflowAgent:
             multi_site=org.multi_site,
             site_count=org.site_count,
             delivery_model=org.delivery_model.value,
+            assessment_scope=org.assessment_scope.value,
             workforce_chars=org.workforce_characteristics or "Not specified",
+            pre_existing_conditions=(
+                "; ".join(org.pre_existing_conditions) if org.pre_existing_conditions else "None stated"
+            ),
             existing_surveillance=org.existing_surveillance or "None described",
             risk_assessment_confirmed=org.risk_assessment_confirmed,
             workers_consulted=org.workers_consulted,

@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONTROL_MEASURE_OPTIONS,
   EXPOSURE_FREQUENCY_DEFINITIONS,
   EXPOSURE_LEVEL_DEFINITIONS,
+  PRE_EXISTING_CONDITION_OPTIONS,
   SECTOR_OPTIONS,
+  WET_WORK_HIGH_RISK_HAND_WASHES,
+  isWetWorkHazard,
   joinSelections,
   splitSelections,
   suggestHealthEffects,
+  suggestSurveillanceLevel,
   suggestWel,
   tasksForSector,
 } from "./form-options";
@@ -41,5 +46,19 @@ describe("form-options", () => {
     expect(suggestWel("noise", "noise")).toMatch(/dB/);
     expect(suggestHealthEffects("noise")).toContain("NIHL");
     expect(suggestHealthEffects("chemical", "isocyanates")).toContain("asthma");
+  });
+
+  it("orders controls by hierarchy of controls", () => {
+    expect(CONTROL_MEASURE_OPTIONS[0]).toBe("Elimination");
+    expect(CONTROL_MEASURE_OPTIONS.at(-1)).toMatch(/PPE/);
+    expect(CONTROL_MEASURE_OPTIONS.some((c) => c.includes("Health surveillance"))).toBe(true);
+  });
+
+  it("detects wet work and surveillance level threshold", () => {
+    expect(isWetWorkHazard("skin")).toBe(true);
+    expect(isWetWorkHazard("chemical", "Wet work / skin irritants")).toBe(true);
+    expect(suggestSurveillanceLevel(WET_WORK_HIGH_RISK_HAND_WASHES + 1)).toBe("higher");
+    expect(suggestSurveillanceLevel(10)).toBe("lower");
+    expect(PRE_EXISTING_CONDITION_OPTIONS.some((c) => c.includes("Asthma"))).toBe(true);
   });
 });

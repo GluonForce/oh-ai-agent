@@ -126,17 +126,51 @@ export const HEALTH_EFFECT_OPTIONS: string[] = [
   "Infectious disease",
 ];
 
+/** Hierarchy of controls order: elimination → PPE (health surveillance = administrative). */
 export const CONTROL_MEASURE_OPTIONS: string[] = [
-  "Elimination / substitution",
-  "Local exhaust ventilation (LEV)",
-  "Respiratory protective equipment (RPE)",
-  "Hearing protection",
-  "Gloves / PPE",
+  "Elimination",
+  "Substitution",
+  "Engineering controls (e.g. LEV, enclosure)",
+  "Workplace monitoring / air sampling",
   "Job rotation / exposure time limits",
   "Training and information",
-  "Health surveillance in place",
-  "Workplace monitoring / air sampling",
+  "Health surveillance (administrative control)",
+  "Respiratory protective equipment (RPE)",
+  "Hearing protection",
+  "Gloves / other PPE (last line of defence)",
 ];
+
+export const PRE_EXISTING_CONDITION_OPTIONS: string[] = [
+  "Asthma / respiratory sensitisation history",
+  "COPD / chronic lung disease",
+  "Eczema / atopic dermatitis",
+  "Hearing loss / tinnitus",
+  "Raynaud's / vibration-related symptoms",
+  "Immunosuppression",
+  "Pregnancy",
+  "Diabetes",
+  "Cardiovascular disease",
+];
+
+/** HSE: wet work >20 hand washes/day is high risk → higher-level surveillance. */
+export const WET_WORK_HIGH_RISK_HAND_WASHES = 20;
+
+export function isWetWorkHazard(
+  category: HazardCategory,
+  hazardPhrase?: string | null,
+  substanceOrAgent?: string | null
+): boolean {
+  if (category === "skin") return true;
+  const text = `${hazardPhrase ?? ""} ${substanceOrAgent ?? ""}`.toLowerCase();
+  return text.includes("wet work") || text.includes("wetwork") || text.includes("hand wash");
+}
+
+export function suggestSurveillanceLevel(
+  handWashesPerDay: number | null | undefined
+): "lower" | "higher" | undefined {
+  if (handWashesPerDay == null) return undefined;
+  return handWashesPerDay > WET_WORK_HIGH_RISK_HAND_WASHES ? "higher" : "lower";
+}
 
 export const EXPOSURE_LEVEL_DEFINITIONS: Record<ExposureLevel, string> = {
   negligible: "Exposure unlikely to cause harm under normal conditions",

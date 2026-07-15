@@ -34,6 +34,10 @@ export type ExposureDuration =
 
 export type DeliveryModel = "ohp_led" | "ohn_led" | "technician" | "mixed" | "none";
 
+export type AssessmentScope = "staff_group" | "individual";
+
+export type SurveillanceLevel = "lower" | "higher";
+
 export type WorkflowComponent =
   | "health_questionnaire"
   | "clinical_assessment"
@@ -87,6 +91,8 @@ export interface HazardProfile {
   workplace_exposure_limit?: string;
   potential_health_effects?: string;
   existing_controls?: string;
+  hand_washes_per_day?: number;
+  surveillance_level?: SurveillanceLevel;
   notes?: string;
 }
 
@@ -96,6 +102,8 @@ export interface OrganisationProfile {
   tasks: string[];
   workforce_size?: number;
   workforce_characteristics?: string;
+  assessment_scope?: AssessmentScope;
+  pre_existing_conditions?: string[];
   multi_site: boolean;
   site_count: number;
   delivery_model: DeliveryModel;

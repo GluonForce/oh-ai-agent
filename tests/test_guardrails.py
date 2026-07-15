@@ -136,3 +136,7 @@ class TestWorkflowConsistencyRules:
         assert "interpretation requires an oh professional" in lower
         assert "statutory checks and competence requirements" in lower
         assert "operational sequence" in lower
+        assert "hierarchy of controls" in lower
+        assert "seqohs" in lower
+        assert "20 hand washes" in lower
+        assert "unilateral hearing loss" in lower

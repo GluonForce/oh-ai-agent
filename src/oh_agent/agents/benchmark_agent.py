@@ -13,13 +13,12 @@ from typing import Any
 
 from uuid_extensions import uuid7
 
-from oh_agent.agents.llm_client import LLMClient, create_llm_client
-
 from oh_agent.agents.guardrails import (
-    GuardrailViolation,
     SYSTEM_GUARDRAIL_PROMPT,
+    GuardrailViolation,
     check_parsed_content,
 )
+from oh_agent.agents.llm_client import LLMClient, create_llm_client
 from oh_agent.config import Settings
 from oh_agent.knowledge.retriever import KnowledgeRetriever, RetrievedChunk
 from oh_agent.models.audit import AuditEntry, AuditEventType
@@ -130,10 +129,16 @@ def _format_hazards(hazards: list[HazardProfile]) -> str:
             f"duration: {h.exposure_duration.value})"
         )
         lines.append(line)
+        if h.substance_or_agent:
+            lines.append(f"  Substance/agent: {h.substance_or_agent}")
         if h.potential_health_effects:
             lines.append(f"  Health effects: {h.potential_health_effects}")
         if h.existing_controls:
             lines.append(f"  Controls: {h.existing_controls}")
+        if h.hand_washes_per_day is not None:
+            lines.append(f"  Hand washes per day: {h.hand_washes_per_day}")
+        if h.surveillance_level is not None:
+            lines.append(f"  Surveillance level: {h.surveillance_level.value}")
     return "\n".join(lines)
 
 
@@ -305,6 +310,8 @@ using a PDCA framework.
 - Name: {org_name}
 - Sector: {sector}
 - Delivery model: {delivery_model}
+- Assessment scope: {assessment_scope}
+- Pre-existing conditions: {pre_existing_conditions}
 - Existing surveillance: {existing_surveillance}
 - Risk assessment confirmed: {risk_assessment_confirmed}
 - Workers consulted: {workers_consulted}
@@ -322,6 +329,9 @@ Assess compliance across these areas:
 3. Governance — is there adequate oversight, delegation, and competence assurance?
 4. Methodology — is the surveillance methodology appropriate for the identified risks?
 5. Escalation process — are abnormal findings escalated through appropriate pathways?
+
+Consider hierarchy of controls and SEQOHS domains 3.2 / 5.2 where relevant.
+For wet work with >20 hand washes/day, expect higher-level health surveillance.
 
 For each audit item, provide:
 - area: the compliance area
@@ -349,7 +359,7 @@ Respond ONLY with valid JSON:
   "governance_assessed": true,
   "methodology_assessed": true,
   "escalation_process_assessed": true,
-  "sources_cited": ["..."]
+  "sources_cited": ["Title — https://..."]
 }}"""
 
 
@@ -393,6 +403,12 @@ class ComplianceAuditAgent:
             org_name=organisation.name,
             sector=organisation.sector,
             delivery_model=organisation.delivery_model.value,
+            assessment_scope=organisation.assessment_scope.value,
+            pre_existing_conditions=(
+                "; ".join(organisation.pre_existing_conditions)
+                if organisation.pre_existing_conditions
+                else "None stated"
+            ),
             existing_surveillance=organisation.existing_surveillance or "None described",
             risk_assessment_confirmed=organisation.risk_assessment_confirmed,
             workers_consulted=organisation.workers_consulted,
@@ -590,6 +606,11 @@ for an organisation's occupational health programme, using a PDCA framework.
 {knowledge_context}
 
 ## Instructions
+Align actions to the hierarchy of controls (elimination → substitution → engineering →
+administrative → PPE). Include clear referral boundaries for human review (e.g.
+established unilateral hearing loss → specialist/OHP pathway, not routine recall only).
+Cite training resources with URLs where relevant (ARTP for respiratory; BSA for audiometry).
+
 For each improvement action, provide:
 - area: the area requiring improvement
 - action: specific actionable step
@@ -609,7 +630,7 @@ Respond ONLY with valid JSON:
     "regulatory_reference": "..."
   }}],
   "management_review_items": ["..."],
-  "sources_cited": ["..."]
+  "sources_cited": ["Title — https://..."]
 }}"""
 
 

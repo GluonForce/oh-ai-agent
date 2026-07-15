@@ -30,8 +30,8 @@ from oh_agent.agents.benchmark_agent import (
     TrendAnalysisAgent,
 )
 from oh_agent.agents.guardrails import MANDATORY_DISCLAIMERS, GuardrailViolation
-from oh_agent.agents.workflow_agent import WorkflowAgent
 from oh_agent.agents.llm_client import create_llm_client
+from oh_agent.agents.workflow_agent import WorkflowAgent
 from oh_agent.config import Settings, get_settings
 from oh_agent.knowledge.ingestion import ingest_directory
 from oh_agent.knowledge.retriever import KnowledgeRetriever
@@ -51,6 +51,14 @@ from oh_agent.models.workflow import (
     TrendAnalysisResponse,
     WorkflowRequest,
     WorkflowResponse,
+)
+from oh_agent.privacy.pii_masking import (
+    mask_compliance_request,
+    mask_improvement_request,
+    mask_org_hazards,
+    mask_text,
+    mask_trend_request,
+    mask_workflow_request,
 )
 from oh_agent.services.audit_service import AuditService
 
@@ -211,6 +219,7 @@ def _handle_llm_error(exc: Exception) -> None:
 async def generate_workflow(request: WorkflowRequest) -> WorkflowResponse:
     """Generate a hazard-specific, risk-profiled OH workflow."""
     settings = _get_settings()
+    request = mask_workflow_request(request, settings)
     retriever = _get_retriever()
     audit_svc = _get_audit()
 
@@ -237,12 +246,13 @@ class BenchmarkRequest(BaseModel):
 async def benchmark(request: BenchmarkRequest) -> BenchmarkResult:
     """Benchmark current practice against regulatory minimums."""
     settings = _get_settings()
+    org, hazards = mask_org_hazards(request.organisation, request.hazards, settings)
     retriever = _get_retriever()
     audit_svc = _get_audit()
 
     agent = BenchmarkAgent(settings=settings, retriever=retriever)
     try:
-        result, audit_entries = agent.benchmark(request.organisation, request.hazards)
+        result, audit_entries = agent.benchmark(org, hazards)
     except Exception as exc:
         _handle_llm_error(exc)
     audit_svc.log_many(audit_entries)
@@ -253,12 +263,13 @@ async def benchmark(request: BenchmarkRequest) -> BenchmarkResult:
 async def gap_analysis(request: BenchmarkRequest) -> GapAnalysis:
     """Perform structured gap analysis against regulatory requirements."""
     settings = _get_settings()
+    org, hazards = mask_org_hazards(request.organisation, request.hazards, settings)
     retriever = _get_retriever()
     audit_svc = _get_audit()
 
     agent = BenchmarkAgent(settings=settings, retriever=retriever)
     try:
-        result, audit_entries = agent.gap_analysis(request.organisation, request.hazards)
+        result, audit_entries = agent.gap_analysis(org, hazards)
     except Exception as exc:
         _handle_llm_error(exc)
     audit_svc.log_many(audit_entries)
@@ -274,6 +285,7 @@ async def gap_analysis(request: BenchmarkRequest) -> GapAnalysis:
 async def compliance_audit(request: ComplianceAuditRequest) -> ComplianceAuditResponse:
     """Evaluate statutory OH compliance (CHECK phase)."""
     settings = _get_settings()
+    request = mask_compliance_request(request, settings)
     retriever = _get_retriever()
     audit_svc = _get_audit()
     agent = ComplianceAuditAgent(settings=settings, retriever=retriever)
@@ -294,6 +306,7 @@ async def compliance_audit(request: ComplianceAuditRequest) -> ComplianceAuditRe
 async def trend_analysis(request: TrendAnalysisRequest) -> TrendAnalysisResponse:
     """Analyse anonymised surveillance data for trends (REVIEW phase)."""
     settings = _get_settings()
+    request = mask_trend_request(request, settings)
     retriever = _get_retriever()
     audit_svc = _get_audit()
     agent = TrendAnalysisAgent(settings=settings, retriever=retriever)
@@ -314,6 +327,7 @@ async def trend_analysis(request: TrendAnalysisRequest) -> TrendAnalysisResponse
 async def improvement_plan(request: ImprovementPlanRequest) -> ImprovementPlanResponse:
     """Generate improvement actions from surveillance findings (ACT phase)."""
     settings = _get_settings()
+    request = mask_improvement_request(request, settings)
     retriever = _get_retriever()
     audit_svc = _get_audit()
     agent = ImprovementPlanAgent(settings=settings, retriever=retriever)
@@ -390,6 +404,13 @@ async def upload_document(file: UploadFile) -> IngestResponse:
     dest = settings.knowledge_dir / file.filename
     settings.knowledge_dir.mkdir(parents=True, exist_ok=True)
     content = await file.read()
+    if suffix in {".txt", ".md"}:
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            text = content.decode("latin-1", errors="replace")
+        masked = mask_text(text, settings)
+        content = (masked or text).encode("utf-8")
     dest.write_bytes(content)
 
     count = ingest_directory(settings, retriever, directory=settings.knowledge_dir)

@@ -8,8 +8,9 @@ from oh_agent.models.hazard import (
     HazardCategory,
     HazardProfile,
     RiskAssessmentConfirmation,
+    SurveillanceLevel,
 )
-from oh_agent.models.organisation import DeliveryModel, OrganisationProfile
+from oh_agent.models.organisation import AssessmentScope, DeliveryModel, OrganisationProfile
 from oh_agent.models.workflow import (
     AssuranceCheckItem,
     BenchmarkResult,
@@ -34,6 +35,7 @@ from oh_agent.models.workflow import (
 )
 
 __all__ = [
+    "AssessmentScope",
     "AssuranceCheckItem",
     "AuditEntry",
     "AuditEventType",
@@ -55,6 +57,7 @@ __all__ = [
     "PDCAPhase",
     "RiskAssessmentConfirmation",
     "RiskProfileSummary",
+    "SurveillanceLevel",
     "SurveillanceProvision",
     "SurveillanceType",
     "TrendAnalysisRequest",

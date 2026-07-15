@@ -91,6 +91,23 @@ class Settings(BaseSettings):
     # --- Audit ---
     audit_log_file: Path = Path("logs/audit.jsonl")
 
+    # --- PII masking (OpenAI Privacy Filter taxonomy) ---
+    pii_masking_enabled: bool = Field(
+        default=True,
+        description="Mask PII in free-text fields before LLM / audit / RAG.",
+    )
+    pii_provider: Literal["regex", "opf"] = Field(
+        default="regex",
+        description=(
+            "regex = lightweight heuristics (default). "
+            "opf = OpenAI Privacy Filter when the optional pii extra is installed."
+        ),
+    )
+    pii_device: Literal["cpu", "cuda"] = Field(
+        default="cpu",
+        description="Inference device when pii_provider=opf.",
+    )
+
 
 def get_settings() -> Settings:
     """Return a cached settings instance."""

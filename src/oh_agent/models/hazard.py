@@ -64,6 +64,13 @@ class ExposureDuration(StrEnum):
     EXTENDED = "extended"  # >8 hours / shift
 
 
+class SurveillanceLevel(StrEnum):
+    """Lower- vs higher-level health surveillance (HSE distinction)."""
+
+    LOWER = "lower"
+    HIGHER = "higher"
+
+
 class HazardProfile(BaseModel):
     """A single hazard with its risk-profiling attributes.
 
@@ -97,6 +104,18 @@ class HazardProfile(BaseModel):
         default=None,
         max_length=1024,
         description="Current control measures in place and their assessed reliability.",
+    )
+    hand_washes_per_day: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "For skin/wet-work hazards: typical hand washes per day. "
+            "HSE treats >20 washes/day as high risk needing higher-level surveillance."
+        ),
+    )
+    surveillance_level: SurveillanceLevel | None = Field(
+        default=None,
+        description="Lower- or higher-level health surveillance recommended for this hazard.",
     )
     notes: str | None = Field(default=None, max_length=2048)
 

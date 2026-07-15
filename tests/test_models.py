@@ -99,15 +99,40 @@ class TestHazardProfile:
         assert "Ear defenders" in (hp.existing_controls or "")
 
 
+    def test_wet_work_surveillance_fields(self) -> None:
+        from oh_agent.models.hazard import SurveillanceLevel
+
+        h = HazardProfile(
+            category=HazardCategory.SKIN,
+            hazard_phrase="Wet work / skin irritants",
+            hand_washes_per_day=25,
+            surveillance_level=SurveillanceLevel.HIGHER,
+        )
+        assert h.hand_washes_per_day == 25
+        assert h.surveillance_level == SurveillanceLevel.HIGHER
+
+
 class TestOrganisationProfile:
     def test_valid_organisation(self, sample_organisation: OrganisationProfile) -> None:
         assert sample_organisation.name == "Acme Manufacturing Ltd"
         assert sample_organisation.sector == "manufacturing"
         assert sample_organisation.delivery_model == DeliveryModel.OHN_LED
 
-    def test_empty_name_rejected(self) -> None:
-        with pytest.raises(ValidationError):
-            OrganisationProfile(name="", sector="test")
+    def test_empty_name_becomes_anonymous(self) -> None:
+        org = OrganisationProfile(name="", sector="test")
+        assert org.name == "Anonymous organisation"
+
+    def test_assessment_scope_and_conditions(self) -> None:
+        from oh_agent.models.organisation import AssessmentScope
+
+        org = OrganisationProfile(
+            name="Test",
+            sector="test",
+            assessment_scope=AssessmentScope.INDIVIDUAL,
+            pre_existing_conditions=["Asthma / respiratory sensitisation history"],
+        )
+        assert org.assessment_scope == AssessmentScope.INDIVIDUAL
+        assert org.pre_existing_conditions[0].startswith("Asthma")
 
     def test_negative_workforce_rejected(self) -> None:
         with pytest.raises(ValidationError):
