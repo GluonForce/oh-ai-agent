@@ -1,4 +1,5 @@
-import type { WorkflowResponse } from "@/lib/types";
+import type { HazardCategory, WorkflowResponse } from "@/lib/types";
+import { parseSourceCitation, resourcesForHazards } from "@/lib/resource-links";
 
 function slugifyFilename(name: string): string {
   const slug = name
@@ -25,14 +26,25 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-export function downloadWorkflowJson(workflow: WorkflowResponse): void {
-  const blob = new Blob([JSON.stringify(workflow, null, 2)], {
+export function downloadWorkflowJson(
+  workflow: WorkflowResponse,
+  hazardCategories: HazardCategory[] = []
+): void {
+  const resources = resourcesForHazards(hazardCategories, workflow.sources_cited);
+  const payload = {
+    ...workflow,
+    resources_for_human_review: resources,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json;charset=utf-8",
   });
   triggerDownload(blob, `${workflowExportBasename(workflow)}.json`);
 }
 
-export function workflowToMarkdown(workflow: WorkflowResponse): string {
+export function workflowToMarkdown(
+  workflow: WorkflowResponse,
+  hazardCategories: HazardCategory[] = []
+): string {
   const lines: string[] = [
     "# Occupational Health PDCA Workflow",
     "",
@@ -139,10 +151,28 @@ export function workflowToMarkdown(workflow: WorkflowResponse): string {
     lines.push("");
   }
 
+  const resources = resourcesForHazards(hazardCategories, workflow.sources_cited);
+  if (resources.length > 0) {
+    lines.push("## Resources for human review", "");
+    lines.push(
+      "Curated links for cross-checking (including training guidance such as ARTP / BSA where relevant):",
+      ""
+    );
+    for (const resource of resources) {
+      lines.push(`- [${resource.title}](${resource.url}) — ${resource.description}`);
+    }
+    lines.push("");
+  }
+
   if (workflow.sources_cited.length > 0) {
-    lines.push("## Sources cited", "");
+    lines.push("## Sources cited (model)", "");
     for (const source of workflow.sources_cited) {
-      lines.push(`- ${source}`);
+      const { title, url } = parseSourceCitation(source);
+      if (url) {
+        lines.push(`- [${title}](${url})`);
+      } else {
+        lines.push(`- ${source}`);
+      }
     }
     lines.push("");
   }
@@ -158,8 +188,11 @@ export function workflowToMarkdown(workflow: WorkflowResponse): string {
   return lines.join("\n");
 }
 
-export function downloadWorkflowMarkdown(workflow: WorkflowResponse): void {
-  const blob = new Blob([workflowToMarkdown(workflow)], {
+export function downloadWorkflowMarkdown(
+  workflow: WorkflowResponse,
+  hazardCategories: HazardCategory[] = []
+): void {
+  const blob = new Blob([workflowToMarkdown(workflow, hazardCategories)], {
     type: "text/markdown;charset=utf-8",
   });
   triggerDownload(blob, `${workflowExportBasename(workflow)}.md`);

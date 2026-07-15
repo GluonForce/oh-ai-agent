@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { OrgHazardForm } from "@/components/org-hazard-form";
+import { SourcesCitedList } from "@/components/sources-cited";
 import { api } from "@/lib/api";
 import type {
   HazardProfile,
@@ -192,11 +193,7 @@ export default function ImprovementPlanPage() {
                 <CardTitle className="text-base">Sources Cited</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {result.sources_cited.map((s, i) => (
-                    <Badge key={i} variant="secondary">{s}</Badge>
-                  ))}
-                </div>
+                <SourcesCitedList sources={result.sources_cited} />
               </CardContent>
             </Card>
           )}

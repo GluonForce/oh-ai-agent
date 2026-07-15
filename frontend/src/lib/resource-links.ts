@@ -76,15 +76,29 @@ export function resourcesForHazards(
   );
   const cited: ResourceLink[] = [];
   for (const src of sourcesCited) {
-    const urlMatch = src.match(/https?:\/\/[^\s)]+/i);
-    if (!urlMatch) continue;
-    const url = urlMatch[0];
-    if (curated.some((c) => c.url === url) || cited.some((c) => c.url === url)) continue;
+    const parsed = parseSourceCitation(src);
+    if (!parsed.url) continue;
+    if (curated.some((c) => c.url === parsed.url) || cited.some((c) => c.url === parsed.url)) {
+      continue;
+    }
     cited.push({
-      title: src.replace(url, "").replace(/[-–—:]\s*$/, "").trim() || url,
-      url,
+      title: parsed.title,
+      url: parsed.url,
       description: "Cited in generated output",
     });
   }
   return [...curated, ...cited];
+}
+
+/** Split a model source string into display title + URL when present. */
+export function parseSourceCitation(source: string): { title: string; url: string | null } {
+  const urlMatch = source.match(/https?:\/\/[^\s)\]]+/i);
+  if (!urlMatch) return { title: source.trim(), url: null };
+  const url = urlMatch[0].replace(/[.,;:]+$/, "");
+  const title =
+    source
+      .replace(urlMatch[0], "")
+      .replace(/[-–—:|]\s*$/, "")
+      .trim() || url;
+  return { title, url };
 }

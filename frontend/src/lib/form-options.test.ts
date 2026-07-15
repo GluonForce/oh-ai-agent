@@ -14,6 +14,7 @@ import {
   suggestWel,
   tasksForSector,
 } from "./form-options";
+import { parseSourceCitation } from "./resource-links";
 
 describe("form-options", () => {
   it("maps sector keys to task catalogs", () => {
@@ -60,5 +61,21 @@ describe("form-options", () => {
     expect(suggestSurveillanceLevel(WET_WORK_HIGH_RISK_HAND_WASHES + 1)).toBe("higher");
     expect(suggestSurveillanceLevel(10)).toBe("lower");
     expect(PRE_EXISTING_CONDITION_OPTIONS.some((c) => c.includes("Asthma"))).toBe(true);
+  });
+});
+
+describe("parseSourceCitation", () => {
+  it("extracts title and URL from model citation strings", () => {
+    const parsed = parseSourceCitation(
+      "Health Surveillance at Work — Key Requirements (Summary based on HSG61) — https://www.hse.gov.uk/health-surveillance/"
+    );
+    expect(parsed.url).toBe("https://www.hse.gov.uk/health-surveillance/");
+    expect(parsed.title).toContain("Health Surveillance at Work");
+  });
+
+  it("keeps plain text when no URL is present", () => {
+    const parsed = parseSourceCitation("COSHH Regulation 11");
+    expect(parsed.url).toBeNull();
+    expect(parsed.title).toBe("COSHH Regulation 11");
   });
 });

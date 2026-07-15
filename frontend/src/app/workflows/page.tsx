@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { OrgHazardForm } from "@/components/org-hazard-form";
+import { SourcesCitedList } from "@/components/sources-cited";
 import { api } from "@/lib/api";
 import { resourcesForHazards } from "@/lib/resource-links";
 import { downloadWorkflowJson, downloadWorkflowMarkdown } from "@/lib/workflow-export";
@@ -175,7 +176,10 @@ export default function WorkflowsPage() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
                     onClick={() => {
-                      downloadWorkflowMarkdown(result);
+                      downloadWorkflowMarkdown(
+                        result,
+                        lastHazards.map((h) => h.category)
+                      );
                       toast.success("Workflow downloaded as Markdown");
                     }}
                   >
@@ -183,7 +187,10 @@ export default function WorkflowsPage() {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => {
-                      downloadWorkflowJson(result);
+                      downloadWorkflowJson(
+                        result,
+                        lastHazards.map((h) => h.category)
+                      );
                       toast.success("Workflow downloaded as JSON");
                     }}
                   >
@@ -541,13 +548,7 @@ export default function WorkflowsPage() {
                   {result.sources_cited.length > 0 && (
                     <div className="pt-2">
                       <p className="text-sm font-medium mb-2">Model sources cited</p>
-                      <div className="flex flex-wrap gap-2">
-                        {result.sources_cited.map((s, i) => (
-                          <Badge key={i} variant="secondary">
-                            {s}
-                          </Badge>
-                        ))}
-                      </div>
+                      <SourcesCitedList sources={result.sources_cited} />
                     </div>
                   )}
                 </CardContent>
